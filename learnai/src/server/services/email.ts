@@ -165,7 +165,7 @@ export async function sendLiveClassReminder(
 
   await sendEmail({
     to,
-    subject: `&#9200; Reminder: &quot;${safeTitle}&quot; starts soon`,
+    subject: `⏰ Reminder: "${classTitle}" starts soon`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: white; border-radius: 16px; overflow: hidden; border: 1px solid #e5e7eb;">
         <div style="background: linear-gradient(135deg, #7c3aed, #4f46e5); padding: 24px 32px;">
