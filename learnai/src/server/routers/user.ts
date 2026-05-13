@@ -36,11 +36,11 @@ export const userRouter = router({
       });
     }),
 
-  // Get dashboard data
+  // FIX #25: get actual total enrollment count, not just the count of the first 10 returned
   getDashboard: protectedProcedure.query(async ({ ctx }) => {
     const userId = ctx.session.user.id;
 
-    const [enrollments, certificates, recentQuizzes] = await Promise.all([
+    const [enrollments, certificates, recentQuizzes, totalEnrolledCount] = await Promise.all([
       ctx.db.enrollment.findMany({
         where: { userId },
         include: {
@@ -69,6 +69,8 @@ export const userRouter = router({
         orderBy: { startedAt: "desc" },
         take: 5,
       }),
+      // Separate count query so stats.totalEnrolled is accurate regardless of `take`
+      ctx.db.enrollment.count({ where: { userId } }),
     ]);
 
     return {
@@ -76,7 +78,7 @@ export const userRouter = router({
       certificates,
       recentQuizzes,
       stats: {
-        totalEnrolled: enrollments.length,
+        totalEnrolled:    totalEnrolledCount,      // actual total, not capped at 10
         totalCertificates: certificates.length,
       },
     };

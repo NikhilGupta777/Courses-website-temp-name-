@@ -9,7 +9,42 @@ const RegisterSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
+// ─── FIX #14: simple in-memory rate limiter ───────────────────────────────────
+// Prevents brute-force account creation from a single IP.
+// In production, replace with a Redis-backed sliding-window counter
+// (e.g. Upstash Ratelimit) for multi-instance safety.
+const rateLimit = new Map<string, { count: number; resetAt: number }>();
+const RATE_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+const MAX_ATTEMPTS   = 10;             // max registrations per IP per window
+
+function isRateLimited(ip: string): boolean {
+  const now   = Date.now();
+  const entry = rateLimit.get(ip);
+
+  if (!entry || now > entry.resetAt) {
+    rateLimit.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return false;
+  }
+
+  if (entry.count >= MAX_ATTEMPTS) return true;
+
+  entry.count++;
+  return false;
+}
+
 export async function POST(req: NextRequest) {
+  // FIX #14: check rate limit before any DB or expensive work
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+           ?? req.headers.get("x-real-ip")
+           ?? "unknown";
+
+  if (isRateLimited(ip)) {
+    return NextResponse.json(
+      { error: "Too many registration attempts. Please try again in 15 minutes." },
+      { status: 429, headers: { "Retry-After": "900" } }
+    );
+  }
+
   try {
     const body = await req.json();
     const parsed = RegisterSchema.safeParse(body);

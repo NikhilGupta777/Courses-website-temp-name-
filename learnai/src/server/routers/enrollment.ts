@@ -56,12 +56,24 @@ export const enrollmentRouter = router({
       return { enrollment, modules };
     }),
 
-  // Mark a lesson as complete and update course progress
+  // FIX #27: translate service-layer Errors into proper TRPCErrors
+  // so the client gets a typed HTTP status instead of a 500 for known cases.
   markComplete: protectedProcedure
     .input(z.object({ lessonId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const newProgress = await markLessonComplete(ctx.session.user.id, input.lessonId);
-      return { progress: newProgress };
+      try {
+        const newProgress = await markLessonComplete(ctx.session.user.id, input.lessonId);
+        return { progress: newProgress };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Could not mark lesson complete";
+        if (message.includes("not enrolled")) {
+          throw new TRPCError({ code: "FORBIDDEN", message });
+        }
+        if (message.includes("not found")) {
+          throw new TRPCError({ code: "NOT_FOUND", message });
+        }
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message });
+      }
     }),
 
   // Save video playback position

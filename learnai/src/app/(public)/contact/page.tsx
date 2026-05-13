@@ -27,9 +27,24 @@ export default function ContactPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 1200)); // simulate submit
-    setSent(true);
-    setLoading(false);
+    // FIX #22: call real API endpoint instead of a fake setTimeout
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error ?? "Failed to send. Please try again.");
+      } else {
+        setSent(true);
+      }
+    } catch {
+      alert("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
