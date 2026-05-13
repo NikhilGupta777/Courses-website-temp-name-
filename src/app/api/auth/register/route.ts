@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import type { Prisma } from "@prisma/client";
 
 const RegisterSchema = z.object({
   name:     z.string().min(2, "Name must be at least 2 characters"),
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest) {
     const hashedPassword = await bcrypt.hash(password, 12);
     const now = new Date();
 
-    const user = await db.$transaction(async (tx) => {
+    const user = await db.$transaction(async (tx: Prisma.TransactionClient) => {
       // Create user
       const createdUser = await tx.user.create({
         data: {
