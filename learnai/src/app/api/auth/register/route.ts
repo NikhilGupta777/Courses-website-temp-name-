@@ -34,28 +34,33 @@ export async function POST(req: NextRequest) {
 
     // Hash password — bcrypt cost factor 12 (strong but not too slow)
     const hashedPassword = await bcrypt.hash(password, 12);
+    const now = new Date();
 
-    // Create user
-    const user = await db.user.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-        role: "STUDENT",
-      },
-      select: { id: true, email: true, name: true },
-    });
+    const user = await db.$transaction(async (tx) => {
+      // Create user
+      const createdUser = await tx.user.create({
+        data: {
+          name,
+          email,
+          password: hashedPassword,
+          role: "STUDENT",
+        },
+        select: { id: true, email: true, name: true },
+      });
 
-    // createUser event in Auth.js handles the FREE subscription creation —
-    // but since we're not going through Auth.js here, create it manually
-    await db.subscription.create({
-      data: {
-        userId: user.id,
-        plan: "FREE",
-        status: "ACTIVE",
-        currentPeriodStart: new Date(),
-        currentPeriodEnd: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000),
-      },
+      // createUser event in Auth.js handles the FREE subscription creation —
+      // but since we're not going through Auth.js here, create it manually
+      await tx.subscription.create({
+        data: {
+          userId: createdUser.id,
+          plan: "FREE",
+          status: "ACTIVE",
+          currentPeriodStart: now,
+          currentPeriodEnd: new Date(now.getTime() + 100 * 365 * 24 * 60 * 60 * 1000),
+        },
+      });
+
+      return createdUser;
     });
 
     return NextResponse.json(
