@@ -1,0 +1,507 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER & AUTH
+// ============================================
+
+enum UserRole {
+  STUDENT
+  INSTRUCTOR
+  ADMIN
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  image         String?
+  password      String?
+  role          UserRole  @default(STUDENT)
+  bio           String?
+  headline      String?
+  emailVerified DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts           Account[]
+  sessions           Session[]
+  enrollments        Enrollment[]
+  payments           Payment[]
+  certificates       Certificate[]
+  quizAttempts       QuizAttempt[]
+  reviews            Review[]
+  notifications      Notification[]
+  instructorProfile  InstructorProfile?
+  progress           LessonProgress[]
+
+  @@index([email])
+  @@index([role])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============================================
+// INSTRUCTOR
+// ============================================
+
+model InstructorProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  displayName     String
+  bio             String
+  expertise       String[]
+  isVerified      Boolean  @default(false)
+  totalStudents   Int      @default(0)
+  totalCourses    Int      @default(0)
+  averageRating   Float    @default(0)
+  stripeAccountId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courses Course[]
+  payouts Payout[]
+}
+
+// ============================================
+// COURSES & CONTENT
+// ============================================
+
+enum CourseLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+enum CourseStatus {
+  DRAFT
+  UNDER_REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+enum DeliveryMode {
+  LIVE_ONLINE
+  OFFLINE_WORKSHOP
+  PRE_RECORDED
+  HYBRID
+}
+
+model Category {
+  id          String     @id @default(cuid())
+  name        String     @unique
+  slug        String     @unique
+  description String?
+  icon        String?
+  parentId    String?
+  parent      Category?  @relation("CategoryChildren", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryChildren")
+  courses     Course[]
+  createdAt   DateTime   @default(now())
+
+  @@index([slug])
+}
+
+model Course {
+  id               String       @id @default(cuid())
+  title            String
+  slug             String       @unique
+  subtitle         String?
+  description      String
+  thumbnail        String?
+  previewVideoUrl  String?
+  level            CourseLevel  @default(BEGINNER)
+  status           CourseStatus @default(DRAFT)
+  deliveryMode     DeliveryMode @default(PRE_RECORDED)
+  language         String       @default("en")
+  duration         Int?
+  price            Float?
+  originalPrice    Float?
+  isFree           Boolean      @default(false)
+  isFeatured       Boolean      @default(false)
+  tags             String[]
+  prerequisites    String[]
+  learningOutcomes String[]
+  totalStudents    Int          @default(0)
+  averageRating    Float        @default(0)
+  totalReviews     Int          @default(0)
+  publishedAt      DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  instructorId String
+  instructor   InstructorProfile @relation(fields: [instructorId], references: [id])
+  categoryId   String?
+  category     Category?         @relation(fields: [categoryId], references: [id])
+  modules      Module[]
+  enrollments  Enrollment[]
+  reviews      Review[]
+  certificates Certificate[]
+  coupons      Coupon[]
+
+  @@index([slug])
+  @@index([status])
+  @@index([instructorId])
+  @@index([categoryId])
+}
+
+model Module {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  position    Int
+  duration    Int?
+  courseId    String
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons    Lesson[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([courseId, position])
+}
+
+enum LessonType {
+  VIDEO
+  ARTICLE
+  QUIZ
+  ASSIGNMENT
+  LIVE_SESSION
+  RESOURCE
+}
+
+model Lesson {
+  id            String     @id @default(cuid())
+  title         String
+  description   String?
+  type          LessonType
+  position      Int
+  duration      Int?
+  isFree        Boolean    @default(false)
+  isPublished   Boolean    @default(false)
+  videoUrl      String?
+  muxAssetId    String?
+  muxPlaybackId String?
+  content       String?
+  resourceUrl   String?
+  moduleId      String
+  module        Module     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  quiz          Quiz?
+  progress      LessonProgress[]
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([moduleId, position])
+}
+
+// ============================================
+// ASSESSMENTS
+// ============================================
+
+model Quiz {
+  id                 String     @id @default(cuid())
+  lessonId           String     @unique
+  lesson             Lesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  title              String
+  description        String?
+  timeLimit          Int?
+  passingScore       Float      @default(70)
+  maxAttempts        Int?
+  shuffleQuestions   Boolean    @default(false)
+  showCorrectAnswers Boolean    @default(true)
+  questions          Question[]
+  attempts           QuizAttempt[]
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  MULTI_SELECT
+  TRUE_FALSE
+  SHORT_ANSWER
+  CODE
+}
+
+model Question {
+  id           String       @id @default(cuid())
+  quizId       String
+  quiz         Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  type         QuestionType
+  text         String
+  explanation  String?
+  points       Int          @default(1)
+  position     Int
+  options      Json?
+  correctAnswer String?
+  createdAt    DateTime     @default(now())
+
+  @@index([quizId, position])
+}
+
+model QuizAttempt {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id])
+  quizId       String
+  quiz         Quiz      @relation(fields: [quizId], references: [id])
+  score        Float
+  totalPoints  Int
+  earnedPoints Int
+  answers      Json
+  startedAt    DateTime  @default(now())
+  completedAt  DateTime?
+  timeTaken    Int?
+
+  @@index([userId, quizId])
+}
+
+// ============================================
+// ENROLLMENT & PROGRESS
+// ============================================
+
+enum EnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  EXPIRED
+  REFUNDED
+}
+
+model Enrollment {
+  id          String           @id @default(cuid())
+  userId      String
+  user        User             @relation(fields: [userId], references: [id])
+  courseId    String
+  course     Course           @relation(fields: [courseId], references: [id])
+  status     EnrollmentStatus @default(ACTIVE)
+  progress   Float            @default(0)
+  enrolledAt DateTime         @default(now())
+  completedAt DateTime?
+  expiresAt  DateTime?
+
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@index([courseId])
+}
+
+model LessonProgress {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  lessonId    String
+  lesson      Lesson    @relation(fields: [lessonId], references: [id])
+  isCompleted Boolean   @default(false)
+  watchTime   Int?
+  lastPosition Int?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([userId, lessonId])
+  @@index([userId])
+}
+
+// ============================================
+// CERTIFICATES
+// ============================================
+
+model Certificate {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id])
+  courseId          String
+  course           Course   @relation(fields: [courseId], references: [id])
+  certificateNumber String   @unique
+  verificationUrl  String   @unique
+  pdfUrl           String?
+  metadata         Json?
+  issuedAt         DateTime @default(now())
+
+  @@index([userId])
+  @@index([certificateNumber])
+}
+
+// ============================================
+// PAYMENTS
+// ============================================
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentType {
+  ONE_TIME
+  SUBSCRIPTION
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id])
+  amount          Float
+  currency        String        @default("usd")
+  status          PaymentStatus @default(PENDING)
+  type            PaymentType
+  stripePaymentId String?       @unique
+  courseId        String?
+  metadata       Json?
+  createdAt      DateTime      @default(now())
+
+  @@index([userId])
+  @@index([stripePaymentId])
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+  TRIALING
+}
+
+enum PlanType {
+  FREE
+  PRO_MONTHLY
+  PRO_ANNUAL
+  ENTERPRISE
+}
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  userId               String
+  plan                 PlanType
+  status               SubscriptionStatus @default(ACTIVE)
+  stripeSubscriptionId String?            @unique
+  stripeCustomerId     String?
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([userId])
+}
+
+model Coupon {
+  id            String    @id @default(cuid())
+  code          String    @unique
+  description   String?
+  discountType  String
+  discountValue Float
+  maxUses       Int?
+  currentUses   Int       @default(0)
+  courseId      String?
+  course       Course?   @relation(fields: [courseId], references: [id])
+  validFrom    DateTime  @default(now())
+  validUntil   DateTime?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+
+  @@index([code])
+}
+
+model Payout {
+  id           String            @id @default(cuid())
+  instructorId String
+  instructor   InstructorProfile @relation(fields: [instructorId], references: [id])
+  amount       Float
+  currency     String            @default("usd")
+  status       String
+  periodStart  DateTime
+  periodEnd    DateTime
+  createdAt    DateTime          @default(now())
+
+  @@index([instructorId])
+}
+
+// ============================================
+// REVIEWS
+// ============================================
+
+model Review {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  courseId  String
+  course   Course   @relation(fields: [courseId], references: [id])
+  rating   Int
+  title    String?
+  comment  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, courseId])
+  @@index([courseId])
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+enum NotificationType {
+  COURSE_UPDATE
+  LIVE_SESSION_REMINDER
+  QUIZ_RESULT
+  CERTIFICATE_ISSUED
+  PAYMENT_RECEIPT
+  PROMOTION
+  SYSTEM
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id])
+  type      NotificationType
+  title     String
+  message   String
+  link      String?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+}
