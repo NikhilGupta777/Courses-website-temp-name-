@@ -201,7 +201,7 @@ export default function LiveClassesPage() {
                 </div>
                 <div className="text-xs font-bold text-violet-400 tracking-widest mb-1">{step.step}</div>
                 <h3 className="text-sm font-semibold text-gray-900 mb-1.5">{step.title}</h3>
-                <p className="text-xs text-gray-500 leading-relaxed" dangerouslySetInnerHTML={{ __html: step.desc }} />
+                <p className="text-xs text-gray-500 leading-relaxed">{step.desc.replaceAll("&apos;", "'")}</p>
               </div>
             ))}
           </div>
