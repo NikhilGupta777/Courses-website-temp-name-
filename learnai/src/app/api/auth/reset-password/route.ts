@@ -17,34 +17,54 @@ export async function POST(req: NextRequest) {
     }
     const { token, password } = parsed.data;
 
-    // Find the token
+    // Find the specific token
     const record = await db.verificationToken.findUnique({ where: { token } });
 
     if (!record) {
-      return NextResponse.json({ error: "Invalid or expired reset link. Please request a new one." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid or expired reset link. Please request a new one." },
+        { status: 400 }
+      );
     }
 
     if (record.expires < new Date()) {
-      await db.verificationToken.delete({ where: { token } });
-      return NextResponse.json({ error: "This reset link has expired. Please request a new one." }, { status: 400 });
+      // Clean up all reset tokens for this identifier, then reject
+      await db.verificationToken.deleteMany({ where: { identifier: record.identifier } });
+      return NextResponse.json(
+        { error: "This reset link has expired. Please request a new one." },
+        { status: 400 }
+      );
     }
 
-    // Hash new password
+    // Hash the new password
     const hashed = await bcrypt.hash(password, 12);
 
-    // Update user
+    // Update the user's password
     const updated = await db.user.update({
       where: { email: record.identifier },
-      data: { password: hashed },
+      data:  { password: hashed },
       select: { id: true },
-    });
+    }).catch(() => null);
 
     if (!updated) {
       return NextResponse.json({ error: "User not found." }, { status: 404 });
     }
 
-    // Delete the used token so it can't be reused
-    await db.verificationToken.delete({ where: { token } });
+    // ─── Fix #7: delete ALL tokens for this email ─────────────────────────────
+    // The original code only deleted the single token used in this request.
+    // Any other unexpired tokens issued earlier (e.g. from multiple "forgot
+    // password" submissions) would remain valid and could be used to set the
+    // password again.  We now delete every verificationToken row for this email
+    // so that no previously-issued token can be replayed.
+    await db.verificationToken.deleteMany({
+      where: { identifier: record.identifier },
+    });
+
+    // Also delete all active sessions for this user so that any session started
+    // with the old password is invalidated immediately.
+    await db.session.deleteMany({
+      where: { userId: updated.id },
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {
