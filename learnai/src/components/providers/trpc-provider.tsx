@@ -5,7 +5,6 @@
 // See: https://trpc.io/docs/client/tanstack-react-query/setup
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { trpcClient } from "@/lib/trpc/client";
 import { useState } from "react";
 
 // Factory: create a new QueryClient per request on the server, singleton on the client

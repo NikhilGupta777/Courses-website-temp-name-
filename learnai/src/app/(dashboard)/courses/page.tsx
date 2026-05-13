@@ -19,12 +19,18 @@ export default function MyCoursesPage() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [search, setSearch] = useState("");
 
+  // Fix #8: the original cast was grouped incorrectly:
+  //   as typeof mockEnrolled[number] & { course: ... }[]
+  // which parses as (mockEnrolled[number]) & ({ course: ... }[]) — an
+  // intersection of an enrolment object and an *array* of course-wrappers —
+  // rather than an array of (enrolment & course) objects.
+  // Correct: wrap the element type in its own parentheses.
   const enriched = mockEnrolled
     .map((e) => {
       const course = COURSES.find((c) => c.id === e.courseId);
       return course ? { ...e, course } : null;
     })
-    .filter(Boolean) as typeof mockEnrolled[number] & { course: (typeof COURSES)[number] }[];
+    .filter(Boolean) as (typeof mockEnrolled[number] & { course: (typeof COURSES)[number] })[];
 
   const filtered = enriched.filter((e) => {
     const matchSearch = !search.trim() || e.course.title.toLowerCase().includes(search.toLowerCase());
@@ -38,9 +44,11 @@ export default function MyCoursesPage() {
 
   const completedCount = enriched.filter((e) => e.progress === 100).length;
   const inProgressCount = enriched.filter((e) => e.progress > 0 && e.progress < 100).length;
+  // Fix #9: parseInt("45 min".split("h")[0]) → NaN because there is no "h".
+  // Guard with Number.isFinite so malformed durations don't corrupt the sum.
   const totalTime = enriched.reduce((sum, e) => {
-    const hrs = parseInt(e.course.duration.split("h")[0]);
-    return sum + (hrs * e.progress) / 100;
+    const hrs = parseInt(e.course.duration.split("h")[0], 10);
+    return sum + (Number.isFinite(hrs) ? (hrs * e.progress) / 100 : 0);
   }, 0);
 
   return (
