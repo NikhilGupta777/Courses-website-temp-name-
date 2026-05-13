@@ -7,7 +7,27 @@ import { COURSES } from "@/lib/data/courses";
 const SPEEDS = ["0.5x", "0.75x", "1x", "1.25x", "1.5x", "2x"];
 
 export default function CourseLearnPage({ params }: { params: { id: string } }) {
-  const course = COURSES.find((c) => c.id === params.id) ?? COURSES[0];
+  const course = COURSES.find((c) => c.id === params.id);
+
+  if (!course) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-900 px-6 text-white">
+        <div className="w-full max-w-md rounded-2xl border border-gray-800 bg-gray-950 p-8 text-center shadow-xl">
+          <h1 className="text-2xl font-semibold">Course not found</h1>
+          <p className="mt-3 text-sm text-gray-400">
+            The course you are trying to access does not exist or is no longer available.
+          </p>
+          <Link
+            href="/courses"
+            className="mt-6 inline-flex items-center rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-400"
+          >
+            Back to courses
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   const allLessons = course.modules.flatMap((m, mi) =>
     m.lessons.map((l, li) => ({ ...l, moduleIndex: mi, lessonIndex: li, moduleTitle: m.title }))
   );
