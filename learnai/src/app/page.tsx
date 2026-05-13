@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { COURSES, LIVE_CLASSES, FREE_COURSE_SLUGS, CATEGORY_COLORS } from "@/lib/data/courses";
+import { COURSES, LIVE_CLASSES, CATEGORY_COLORS } from "@/lib/data/courses";
 import { PLANS } from "@/lib/data/pricing";
 
 const stats = [
