@@ -12,7 +12,7 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     // TODO: Implement with Auth.js
-    console.log("Login:", { email, password });
+    console.log("Login attempt:", { email });
     setIsLoading(false);
   };
 
