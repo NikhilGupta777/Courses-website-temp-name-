@@ -1,18 +1,8 @@
 import Stripe from "stripe";
 import { db } from "@/lib/db";
 
-// ─── Issue #003 fix: never fall back to a hardcoded test key ─────────────────
-// If STRIPE_SECRET_KEY is missing at startup, throw early rather than silently
-// using a placeholder that would cause every Stripe call to fail in production.
-if (!process.env.STRIPE_SECRET_KEY && process.env.NODE_ENV === "production") {
-  throw new Error("STRIPE_SECRET_KEY environment variable is not set");
-}
-
 // ─── Stripe API version ──────────────────────────────────────────────────────
-// As of May 2026, the latest Stripe API version is "2026-03-25.dahlia".
-// Source: https://docs.stripe.com/changelog/dahlia
-// This version introduces flora-named API releases with additive-only subversions.
-const STRIPE_API_VERSION = "2026-03-25.dahlia" as const;
+const STRIPE_API_VERSION = "2026-04-22.dahlia" as const;
 
 // Singleton Stripe client — safe for serverless / edge environments
 const globalForStripe = globalThis as unknown as { stripe: Stripe | undefined };

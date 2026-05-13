@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BLOG_POSTS, BLOG_CATEGORIES, getFeaturedPosts } from "@/lib/data/blog";
+import { NewsletterForm } from "@/components/ui/newsletter-form";
 
 export const metadata: Metadata = {
   title: "Blog — AI Insights, Tutorials & Career Tips | LearnAI",
@@ -147,19 +148,7 @@ export default function BlogPage() {
           <p className="text-violet-200 mb-6 max-w-lg mx-auto">
             Get the latest AI tutorials, tool comparisons, and career tips delivered to your inbox every week.
           </p>
-          <form className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto" onSubmit={(e) => e.preventDefault()}>
-            <input
-              type="email"
-              placeholder="your@email.com"
-              className="flex-1 px-4 py-3 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-white"
-            />
-            <button
-              type="submit"
-              className="px-6 py-3 bg-white text-violet-700 font-semibold rounded-xl hover:bg-violet-50 transition-colors whitespace-nowrap"
-            >
-              Subscribe Free
-            </button>
-          </form>
+          <NewsletterForm />
           <p className="text-violet-300 text-xs mt-3">No spam. Unsubscribe anytime.</p>
         </section>
       </div>

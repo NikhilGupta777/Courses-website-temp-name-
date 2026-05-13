@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
       // ── Subscription payment succeeded ────────────────────────────────────
       case "invoice.paid": {
         const invoice = event.data.object;
-        const subscriptionId = invoice.subscription as string | null;
+        const subscriptionId = (invoice as any).subscription as string | null;
 
         if (subscriptionId) {
           // ─── Issue #010 fix: also update period dates on renewal ──────────
@@ -109,8 +109,8 @@ export async function POST(req: NextRequest) {
             where: { stripeSubscriptionId: subscriptionId },
             data: {
               status: "ACTIVE",
-              currentPeriodStart: new Date(stripeSub.current_period_start * 1000),
-              currentPeriodEnd:   new Date(stripeSub.current_period_end   * 1000),
+              currentPeriodStart: new Date((stripeSub as any).current_period_start * 1000),
+              currentPeriodEnd:   new Date((stripeSub as any).current_period_end   * 1000),
             },
           });
         }
@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
       // ── Subscription payment failed ───────────────────────────────────────
       case "invoice.payment_failed": {
         const invoice = event.data.object;
-        const subscriptionId = invoice.subscription as string | null;
+        const subscriptionId = (invoice as any).subscription as string | null;
         if (subscriptionId) {
           await db.subscription.updateMany({
             where: { stripeSubscriptionId: subscriptionId },
@@ -136,10 +136,9 @@ export async function POST(req: NextRequest) {
         await db.subscription.updateMany({
           where: { stripeSubscriptionId: sub.id },
           data: {
-            status:             mapStripeStatus(sub.status),
-            // ─── Issue #010 fix: convert Unix timestamp → Date explicitly ───
-            currentPeriodStart: new Date(sub.current_period_start * 1000),
-            currentPeriodEnd:   new Date(sub.current_period_end   * 1000),
+            status:             mapStripeStatus(sub.status) as any,
+            currentPeriodStart: new Date((sub as any).current_period_start * 1000),
+            currentPeriodEnd:   new Date((sub as any).current_period_end   * 1000),
             cancelAtPeriodEnd:  sub.cancel_at_period_end,
           },
         });

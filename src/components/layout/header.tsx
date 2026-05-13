@@ -17,7 +17,7 @@ export function Header() {
 
   // FIX #1 / #16 / #17: read real session from Auth.js instead of MOCK_USER = null
   const { data: session, status } = useSession();
-  const user = session?.user as (typeof session.user & { role?: string }) | undefined;
+  const user = session?.user as (NonNullable<typeof session>["user"] & { role?: string }) | undefined;
   const isLoading = status === "loading";
 
   const handleSignOut = () => {

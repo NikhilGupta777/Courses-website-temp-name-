@@ -68,12 +68,9 @@ const nextConfig: NextConfig = {
     },
   },
 
-  // ── TypeScript / ESLint (strict in CI, lenient in dev) ──────────────────────
+  // ── TypeScript (strict in CI) ────────────────────────────────────────────────
   typescript: {
     ignoreBuildErrors: false,
-  },
-  eslint: {
-    ignoreDuringBuilds: false,
   },
 };
 

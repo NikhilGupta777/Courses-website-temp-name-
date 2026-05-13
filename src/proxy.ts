@@ -51,7 +51,7 @@ async function getSessionPayload(req: NextRequest): Promise<SessionPayload | nul
   return null;
 }
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   const session = await getSessionPayload(req);
