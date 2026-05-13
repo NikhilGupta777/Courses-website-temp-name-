@@ -9,6 +9,11 @@ interface Props {
   params: { certNumber: string };
 }
 
+interface CertificateMetadata {
+  instructorName?: string;
+  score?: number;
+}
+
 // Dynamic metadata so OG preview shows the student's name
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
@@ -32,11 +37,11 @@ export default async function VerifyCertificatePage({ params }: Props) {
         issuedAt:     new Date(record.issuedAt).toLocaleDateString("en-IN", {
           day: "numeric", month: "long", year: "numeric",
         }),
-        instructor:   (record.metadata as any)?.instructorName ?? "LearnAI Instructor",
+        instructor:   (record.metadata as CertificateMetadata | null)?.instructorName ?? "LearnAI Instructor",
         duration:     record.course?.duration
           ? `${Math.floor(record.course.duration / 60)}h ${record.course.duration % 60}m`
           : null,
-        score:        (record.metadata as any)?.score as number | undefined,
+        score:        (record.metadata as CertificateMetadata | null)?.score,
       }
     : null;
 

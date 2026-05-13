@@ -6,10 +6,29 @@ import Link from "next/link";
 const TABS = ["Profile", "Account", "Billing", "Notifications"] as const;
 type Tab = typeof TABS[number];
 
+interface ProfileForm {
+  name: string;
+  email: string;
+  phone: string;
+  bio: string;
+  headline: string;
+  linkedin: string;
+  github: string;
+}
+
+const PROFILE_FIELDS: Array<{ label: string; key: keyof ProfileForm; type: string }> = [
+  { label: "Full Name", key: "name", type: "text" },
+  { label: "Email", key: "email", type: "email" },
+  { label: "Phone Number", key: "phone", type: "tel" },
+  { label: "Professional Headline", key: "headline", type: "text" },
+  { label: "LinkedIn URL", key: "linkedin", type: "url" },
+  { label: "GitHub URL", key: "github", type: "url" },
+];
+
 export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<Tab>("Profile");
   const [saved, setSaved] = useState(false);
-  const [profile, setProfile] = useState({
+  const [profile, setProfile] = useState<ProfileForm>({
     name: "Ankit Verma",
     email: "ankit@example.com",
     phone: "+91 98765 43210",
@@ -76,17 +95,10 @@ export default function ProfilePage() {
 
               {/* Form fields */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                {[
-                  { label: "Full Name", key: "name", type: "text" },
-                  { label: "Email", key: "email", type: "email" },
-                  { label: "Phone Number", key: "phone", type: "tel" },
-                  { label: "Professional Headline", key: "headline", type: "text" },
-                  { label: "LinkedIn URL", key: "linkedin", type: "url" },
-                  { label: "GitHub URL", key: "github", type: "url" },
-                ].map((field) => (
+                {PROFILE_FIELDS.map((field) => (
                   <div key={field.key}>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">{field.label}</label>
-                    <input type={field.type} value={(profile as any)[field.key]}
+                    <input type={field.type} value={profile[field.key]}
                       onChange={(e) => setProfile({ ...profile, [field.key]: e.target.value })}
                       className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent" />
                   </div>

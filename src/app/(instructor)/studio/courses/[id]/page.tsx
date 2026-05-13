@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { COURSES } from "@/lib/data/courses";
+import { COURSES, type CourseLevel } from "@/lib/data/courses";
 
 type LessonType = "VIDEO" | "ARTICLE" | "QUIZ" | "EXERCISE";
 
@@ -46,7 +46,6 @@ export default function CourseEditorPage({ params }: { params: { id: string } })
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<"info" | "curriculum" | "pricing">("info");
-  const [draggingModuleId, setDraggingModuleId] = useState<string | null>(null);
 
   const handleSave = async () => {
     setSaving(true);
@@ -169,7 +168,7 @@ export default function CourseEditorPage({ params }: { params: { id: string } })
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Level</label>
-                <select value={level} onChange={(e) => setLevel(e.target.value as any)}
+                <select value={level} onChange={(e) => setLevel(e.target.value as CourseLevel)}
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-500">
                   {["Beginner", "Intermediate", "Advanced", "Expert"].map((l) => (
                     <option key={l}>{l}</option>
@@ -311,7 +310,7 @@ export default function CourseEditorPage({ params }: { params: { id: string } })
                       <input type="number" value={originalPrice} onChange={(e) => setOriginalPrice(e.target.value)}
                         className="w-full pl-8 pr-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500" />
                     </div>
-                    <p className="text-xs text-gray-400 mt-1">Shown with strikethrough as the "was" price</p>
+                    <p className="text-xs text-gray-400 mt-1">Shown with strikethrough as the &quot;was&quot; price</p>
                   </div>
                 </div>
                 {price && originalPrice && Number(originalPrice) > Number(price) && (

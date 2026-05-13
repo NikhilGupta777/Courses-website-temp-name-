@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { router, publicProcedure, instructorProcedure } from "@/lib/trpc/server";
+import type { Prisma } from "@prisma/client";
+import { router, publicProcedure } from "@/lib/trpc/server";
 
 export const courseRouter = router({
   // Get all published courses with filters
@@ -21,7 +22,7 @@ export const courseRouter = router({
       const limit = input?.limit ?? 12;
       const skip = (page - 1) * limit;
 
-      const where: any = { status: "PUBLISHED" };
+      const where: Prisma.CourseWhereInput = { status: "PUBLISHED" };
 
       if (input?.category) where.category = { slug: input.category };
       if (input?.level) where.level = input.level;
@@ -34,7 +35,7 @@ export const courseRouter = router({
         ];
       }
 
-      const orderBy: any = (() => {
+      const orderBy: Prisma.CourseOrderByWithRelationInput = (() => {
         switch (input?.sortBy) {
           case "newest": return { createdAt: "desc" };
           case "rating": return { averageRating: "desc" };

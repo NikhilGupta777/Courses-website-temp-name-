@@ -7,6 +7,10 @@ import { db } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 
+type UserWithRole = {
+  role?: string;
+};
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(db),
 
@@ -81,7 +85,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           const dbUser = await db.user.findUnique({ where: { email: user.email! } });
           token.role = dbUser?.role ?? "STUDENT";
         } else {
-          token.role = (user as any).role ?? "STUDENT";
+          token.role = (user as UserWithRole).role ?? "STUDENT";
         }
       }
       return token;
@@ -91,7 +95,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.id as string;
-        (session.user as any).role = token.role;
+        (session.user as UserWithRole).role = typeof token.role === "string" ? token.role : "STUDENT";
       }
       return session;
     },

@@ -24,7 +24,6 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 export default function BlogPage() {
   const featured = getFeaturedPosts();
-  const recent = BLOG_POSTS.filter((p) => !p.featured).slice(0, 4);
 
   return (
     <div className="min-h-screen bg-white">

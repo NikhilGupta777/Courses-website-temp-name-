@@ -1,4 +1,7 @@
 import type { NextConfig } from "next";
+import path from "node:path";
+
+const projectRoot = path.resolve();
 
 // ─── Security headers ─────────────────────────────────────────────────────────
 // Applied to every route. These protect against XSS, clickjacking, MIME sniffing,
@@ -34,6 +37,10 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    root: projectRoot,
+  },
+
   // ── Security headers on every response ─────────────────────────────────────
   async headers() {
     return [

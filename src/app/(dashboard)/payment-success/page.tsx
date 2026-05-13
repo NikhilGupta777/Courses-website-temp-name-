@@ -3,48 +3,43 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
 import { COURSES } from "@/lib/data/courses";
+
+const CONFETTI_COLORS = ["#7c3aed", "#4f46e5", "#10b981", "#f59e0b", "#ec4899"] as const;
+const CONFETTI_PARTICLES = Array.from({ length: 30 }, (_, i) => {
+  const seed = i + 1;
+  return {
+    left: `${(seed * 37) % 100}%`,
+    top: `${(seed * 53) % 100}%`,
+    backgroundColor: CONFETTI_COLORS[seed % CONFETTI_COLORS.length],
+    animationDelay: `${((seed * 17) % 20) / 10}s`,
+    animationDuration: `${0.6 + ((seed * 13) % 10) / 10}s`,
+    opacity: 0.2 + ((seed * 19) % 8) / 10,
+    transform: `rotate(${(seed * 47) % 360}deg)`,
+  };
+});
 
 function PaymentSuccessContent() {
   const searchParams = useSearchParams();
   const enrolledCourseId = searchParams.get("enrolled");
   const subscribed       = searchParams.get("subscribed") === "true";
-  const [confetti, setConfetti] = useState(false);
 
   const enrolledCourse = enrolledCourseId
     ? COURSES.find((c) => c.id === enrolledCourseId)
     : null;
 
-  useEffect(() => {
-    // Trigger confetti after mount
-    setConfetti(true);
-    const t = setTimeout(() => setConfetti(false), 3500);
-    return () => clearTimeout(t);
-  }, []);
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-violet-50 via-white to-green-50 flex items-center justify-center px-4 py-16">
       {/* Confetti particles */}
-      {confetti && (
-        <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
-          {Array.from({ length: 30 }).map((_, i) => (
-            <div
-              key={i}
-              className="absolute w-3 h-3 rounded-sm animate-bounce"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                backgroundColor: ["#7c3aed","#4f46e5","#10b981","#f59e0b","#ec4899"][Math.floor(Math.random() * 5)],
-                animationDelay: `${Math.random() * 2}s`,
-                animationDuration: `${0.6 + Math.random()}s`,
-                opacity: Math.random() * 0.8 + 0.2,
-                transform: `rotate(${Math.random() * 360}deg)`,
-              }}
-            />
-          ))}
-        </div>
-      )}
+      <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden" aria-hidden="true">
+        {CONFETTI_PARTICLES.map((style, i) => (
+          <div
+            key={i}
+            className="absolute w-3 h-3 rounded-sm animate-bounce"
+            style={style}
+          />
+        ))}
+      </div>
 
       <div className="max-w-lg w-full">
         {subscribed ? (

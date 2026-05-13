@@ -7,6 +7,17 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 
+type QueryErrorWithStatus = {
+  data?: {
+    httpStatus?: number;
+  };
+};
+
+function getHttpStatus(error: unknown): number | undefined {
+  if (typeof error !== "object" || error === null) return undefined;
+  return (error as QueryErrorWithStatus).data?.httpStatus;
+}
+
 // Factory: create a new QueryClient per request on the server, singleton on the client
 function makeQueryClient() {
   return new QueryClient({
@@ -14,9 +25,10 @@ function makeQueryClient() {
       queries: {
         // With SSR, avoid refetching immediately on mount
         staleTime: 60 * 1000, // 1 minute
-        retry: (failureCount, error: any) => {
+        retry: (failureCount, error: unknown) => {
           // Don't retry on 4xx errors
-          if (error?.data?.httpStatus >= 400 && error?.data?.httpStatus < 500) return false;
+          const httpStatus = getHttpStatus(error);
+          if (httpStatus && httpStatus >= 400 && httpStatus < 500) return false;
           return failureCount < 2;
         },
       },

@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 
+type SessionUserWithRole = {
+  role?: string;
+};
+
 // POST /api/upload/video
 // Returns a Mux direct upload URL for the client to PUT the video file to.
 // Requires authentication — only instructors and admins may upload course videos.
@@ -11,7 +15,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if ((session.user as any).role !== "INSTRUCTOR" && (session.user as any).role !== "ADMIN") {
+  const role = (session.user as SessionUserWithRole).role;
+  if (role !== "INSTRUCTOR" && role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

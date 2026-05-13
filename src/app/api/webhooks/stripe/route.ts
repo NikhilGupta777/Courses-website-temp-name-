@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import { db } from "@/lib/db";
 
@@ -11,7 +12,18 @@ import { db } from "@/lib/db";
 // Our DB enum is UPPER_CASE. Map explicitly instead of blindly calling
 // .toUpperCase() which breaks on Stripe values like "past_due" → "PAST_DUE" ✓
 // but "unpaid" → "UNPAID" which doesn't exist in our schema.
-const STRIPE_STATUS_MAP: Record<string, string> = {
+type SubscriptionStatusValue = "ACTIVE" | "PAST_DUE" | "CANCELLED" | "EXPIRED" | "TRIALING";
+
+type StripeInvoiceWithSubscription = Stripe.Invoice & {
+  subscription?: string | Stripe.Subscription | null;
+};
+
+type StripeSubscriptionWithPeriods = Stripe.Subscription & {
+  current_period_start: number;
+  current_period_end: number;
+};
+
+const STRIPE_STATUS_MAP: Record<string, SubscriptionStatusValue> = {
   active:             "ACTIVE",
   past_due:           "PAST_DUE",
   canceled:           "CANCELLED",   // Stripe spells it "canceled"
@@ -23,8 +35,14 @@ const STRIPE_STATUS_MAP: Record<string, string> = {
   paused:             "PAST_DUE",
 };
 
-function mapStripeStatus(stripeStatus: string): string {
+function mapStripeStatus(stripeStatus: string): SubscriptionStatusValue {
   return STRIPE_STATUS_MAP[stripeStatus] ?? "PAST_DUE";
+}
+
+function getSubscriptionId(invoice: StripeInvoiceWithSubscription): string | null {
+  const subscription = invoice.subscription;
+  if (typeof subscription === "string") return subscription;
+  return subscription?.id ?? null;
 }
 
 export async function POST(req: NextRequest) {
@@ -48,9 +66,10 @@ export async function POST(req: NextRequest) {
   try {
     // This verifies the HMAC-SHA256 signature — rejects tampered or replayed events
     event = stripe.webhooks.constructEvent(body, signature, process.env.STRIPE_WEBHOOK_SECRET);
-  } catch (err: any) {
-    console.error("Stripe webhook signature verification failed:", err.message);
-    return NextResponse.json({ error: `Webhook signature verification failed: ${err.message}` }, { status: 400 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown signature verification error";
+    console.error("Stripe webhook signature verification failed:", message);
+    return NextResponse.json({ error: `Webhook signature verification failed: ${message}` }, { status: 400 });
   }
 
   try {
@@ -99,18 +118,18 @@ export async function POST(req: NextRequest) {
 
       // ── Subscription payment succeeded ────────────────────────────────────
       case "invoice.paid": {
-        const invoice = event.data.object;
-        const subscriptionId = (invoice as any).subscription as string | null;
+        const invoice = event.data.object as StripeInvoiceWithSubscription;
+        const subscriptionId = getSubscriptionId(invoice);
 
         if (subscriptionId) {
           // ─── Issue #010 fix: also update period dates on renewal ──────────
-          const stripeSub = await stripe.subscriptions.retrieve(subscriptionId);
+          const stripeSub = await stripe.subscriptions.retrieve(subscriptionId) as unknown as StripeSubscriptionWithPeriods;
           await db.subscription.updateMany({
             where: { stripeSubscriptionId: subscriptionId },
             data: {
               status: "ACTIVE",
-              currentPeriodStart: new Date((stripeSub as any).current_period_start * 1000),
-              currentPeriodEnd:   new Date((stripeSub as any).current_period_end   * 1000),
+              currentPeriodStart: new Date(stripeSub.current_period_start * 1000),
+              currentPeriodEnd:   new Date(stripeSub.current_period_end   * 1000),
             },
           });
         }
@@ -119,8 +138,8 @@ export async function POST(req: NextRequest) {
 
       // ── Subscription payment failed ───────────────────────────────────────
       case "invoice.payment_failed": {
-        const invoice = event.data.object;
-        const subscriptionId = (invoice as any).subscription as string | null;
+        const invoice = event.data.object as StripeInvoiceWithSubscription;
+        const subscriptionId = getSubscriptionId(invoice);
         if (subscriptionId) {
           await db.subscription.updateMany({
             where: { stripeSubscriptionId: subscriptionId },
@@ -132,13 +151,13 @@ export async function POST(req: NextRequest) {
 
       // ── Subscription updated (upgrade / downgrade / trial end) ────────────
       case "customer.subscription.updated": {
-        const sub = event.data.object;
+        const sub = event.data.object as StripeSubscriptionWithPeriods;
         await db.subscription.updateMany({
           where: { stripeSubscriptionId: sub.id },
           data: {
-            status:             mapStripeStatus(sub.status) as any,
-            currentPeriodStart: new Date((sub as any).current_period_start * 1000),
-            currentPeriodEnd:   new Date((sub as any).current_period_end   * 1000),
+            status:             mapStripeStatus(sub.status),
+            currentPeriodStart: new Date(sub.current_period_start * 1000),
+            currentPeriodEnd:   new Date(sub.current_period_end   * 1000),
             cancelAtPeriodEnd:  sub.cancel_at_period_end,
           },
         });

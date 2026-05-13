@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import crypto from "crypto";
 
+type MuxPayload = {
+  type: string;
+  data: Record<string, unknown>;
+};
+
+type MuxPlaybackId = {
+  id?: string;
+};
+
 // ─── Issue #011 fix: verify Mux webhook signature ────────────────────────────
 // Without verification, any HTTP client can POST fake "video.asset.ready" events
 // and flip lesson video status to "ready" for content that was never uploaded.
@@ -71,7 +80,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
-  let parsedBody: { type: string; data: Record<string, any> };
+  let parsedBody: MuxPayload;
   try {
     parsedBody = JSON.parse(rawBody);
   } catch {
@@ -85,9 +94,11 @@ export async function POST(req: NextRequest) {
       // Video is ready to stream
       case "video.asset.ready": {
         const { id: muxAssetId, playback_ids } = data;
-        const playbackId = playback_ids?.[0]?.id as string | undefined;
+        const playbackId = Array.isArray(playback_ids)
+          ? (playback_ids[0] as MuxPlaybackId | undefined)?.id
+          : undefined;
 
-        if (muxAssetId && playbackId) {
+        if (typeof muxAssetId === "string" && playbackId) {
           await db.lesson.updateMany({
             where: { muxAssetId },
             data: {
@@ -103,7 +114,7 @@ export async function POST(req: NextRequest) {
       // Video processing failed
       case "video.asset.errored": {
         const { id: muxAssetId } = data;
-        if (muxAssetId) {
+        if (typeof muxAssetId === "string") {
           await db.lesson.updateMany({
             where: { muxAssetId },
             data: { videoStatus: "errored" },
@@ -115,8 +126,8 @@ export async function POST(req: NextRequest) {
 
       // Upload completed and asset was created
       case "video.upload.asset_created": {
-        const { upload_id, asset_id } = data as { upload_id: string; asset_id: string };
-        if (upload_id && asset_id) {
+        const { upload_id, asset_id } = data;
+        if (typeof upload_id === "string" && typeof asset_id === "string") {
           await db.lesson.updateMany({
             where: { videoUrl: upload_id },
             data: {

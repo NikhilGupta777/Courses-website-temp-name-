@@ -129,9 +129,6 @@ export default function MyCoursesPage() {
           <div className="space-y-4">
             {filtered.map((item) => {
               const isComplete = item.progress === 100;
-              const discountPct = item.course.originalPrice > item.course.price
-                ? Math.round((1 - item.course.price / item.course.originalPrice) * 100)
-                : 0;
               return (
                 <div key={item.courseId} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col sm:flex-row gap-5 hover:shadow-md transition-shadow">
                   {/* Thumbnail */}
