@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (record.expires < new Date()) {
-      // Clean up this one expired token only, then reject
+      // Clean up all reset tokens for this identifier, then reject
       await db.verificationToken.deleteMany({ where: { identifier: record.identifier } });
       return NextResponse.json(
         { error: "This reset link has expired. Please request a new one." },
