@@ -16,7 +16,7 @@ export default function RegisterPage() {
     e.preventDefault();
     setIsLoading(true);
     // TODO: Implement with Auth.js
-    console.log("Register:", formData);
+    console.log("Register:", { name: formData.name, email: formData.email });
     setIsLoading(false);
   };
 
