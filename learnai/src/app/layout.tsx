@@ -4,12 +4,13 @@ import "./globals.css";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { SessionProvider } from "next-auth/react";
+import { TRPCProvider } from "@/components/providers/trpc-provider";
+import { ToastProvider } from "@/components/ui/toast";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], display: "swap" });
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://learnai.in";
 
-// FIX #18: comprehensive metadata with Open Graph, Twitter Card, robots
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
   title: {
@@ -75,21 +76,30 @@ export const metadata: Metadata = {
     },
   },
 
-  // Verification (fill in once accounts are created)
-  verification: {
-    google: process.env.GOOGLE_SITE_VERIFICATION,
-  },
-
   // App icons
   icons: {
-    icon: "/favicon.ico",
-    shortcut: "/favicon-16x16.png",
-    apple: "/apple-touch-icon.png",
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png" }],
+    other: [{ rel: "mask-icon", url: "/safari-pinned-tab.svg", color: "#7c3aed" }],
   },
 
+  // PWA manifest
+  manifest: "/manifest.json",
+
   // Canonical
-  alternates: {
-    canonical: APP_URL,
+  alternates: { canonical: APP_URL },
+
+  // App meta
+  applicationName: "LearnAI",
+  category: "education",
+
+  // Verification
+  verification: {
+    google: process.env.GOOGLE_SITE_VERIFICATION,
   },
 };
 
@@ -98,15 +108,28 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className="scroll-smooth">
+      <head>
+        {/* PWA theme color */}
+        <meta name="theme-color" content="#7c3aed" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="LearnAI" />
+      </head>
       <body className={`${inter.className} antialiased`}>
         {/*
-          SessionProvider makes useSession() available throughout the app.
-          Required for the header to read the logged-in user.
+          Provider hierarchy (order matters):
+          1. SessionProvider  — Auth.js session available everywhere
+          2. TRPCProvider     — QueryClient + tRPC client
+          3. ToastProvider    — Toast notifications + Toaster portal
         */}
         <SessionProvider>
-          <Header />
-          <main className="min-h-screen pt-16">{children}</main>
-          <Footer />
+          <TRPCProvider>
+            <ToastProvider>
+              <Header />
+              <main className="min-h-screen pt-16">{children}</main>
+              <Footer />
+            </ToastProvider>
+          </TRPCProvider>
         </SessionProvider>
       </body>
     </html>
