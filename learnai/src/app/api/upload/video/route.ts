@@ -11,6 +11,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  if (session.user.role !== "instructor" && session.user.role !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   try {
     const body = await req.json();
     const { lessonId } = body;
