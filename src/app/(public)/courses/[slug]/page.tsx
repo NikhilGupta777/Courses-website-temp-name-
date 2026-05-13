@@ -25,8 +25,9 @@ export async function generateStaticParams() {
   return COURSES.map((c) => ({ slug: c.slug }));
 }
 
-export async function generateMetadata({ params }: { params: { slug: string } }) {
-  const course = getCourseBySlug(params.slug);
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const course = getCourseBySlug(slug);
   if (!course) return {};
   return {
     title: `${course.title} | LearnAI`,
@@ -40,8 +41,9 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 }
 
-export default function CourseDetailPage({ params }: { params: { slug: string } }) {
-  const course = getCourseBySlug(params.slug);
+export default async function CourseDetailPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const course = getCourseBySlug(slug);
   if (!course) notFound();
 
   const colors = CATEGORY_COLORS[course.category] ?? { from: "from-violet-100", to: "to-indigo-200", icon: "text-violet-600" };

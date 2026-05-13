@@ -90,7 +90,8 @@ function TimerBar({ timeLeft, total }: { timeLeft: number; total: number }) {
 }
 
 export default function QuizPage({ params }: { params: { id: string } }) {
-  const course = COURSES.find((c) => c.id === params.id) ?? COURSES[0];
+  const { id } = params;
+  const course = COURSES.find((c) => c.id === id) ?? COURSES[0];
   const quiz = mockQuiz;
 
   const [currentQ, setCurrentQ] = useState(0);
@@ -166,7 +167,7 @@ export default function QuizPage({ params }: { params: { id: string } }) {
                 Retake Quiz
               </button>
               <Link
-                href={`/dashboard/courses/${params.id}/learn`}
+                href={`/dashboard/courses/${id}/learn`}
                 className={`px-5 py-2.5 font-semibold rounded-xl text-sm text-white transition-colors ${passed ? "bg-green-600 hover:bg-green-700" : "bg-violet-600 hover:bg-violet-700"}`}
               >
                 {passed ? "Continue Course →" : "Review Lessons"}

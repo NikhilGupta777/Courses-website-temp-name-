@@ -7,7 +7,8 @@ import { COURSES } from "@/lib/data/courses";
 const SPEEDS = ["0.5x", "0.75x", "1x", "1.25x", "1.5x", "2x"];
 
 export default function CourseLearnPage({ params }: { params: { id: string } }) {
-  const course = COURSES.find((c) => c.id === params.id);
+  const { id } = params;
+  const course = COURSES.find((c) => c.id === id);
 
   if (!course) {
     return (
