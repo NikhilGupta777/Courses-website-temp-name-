@@ -44,8 +44,9 @@ export default function MyCoursesPage() {
 
   const completedCount = enriched.filter((e) => e.progress === 100).length;
   const inProgressCount = enriched.filter((e) => e.progress > 0 && e.progress < 100).length;
-  // Fix #9: parseInt("45 min".split("h")[0]) → NaN because there is no "h".
-  // Guard with Number.isFinite so malformed durations don't corrupt the sum.
+  // Fix #9: after splitting on "h", parseInt only works when the result starts
+  // with digits; Number.isFinite guards against malformed durations such as
+  // non-numeric prefixes so they don't corrupt the sum.
   const totalTime = enriched.reduce((sum, e) => {
     const hrs = parseInt(e.course.duration.split("h")[0], 10);
     return sum + (Number.isFinite(hrs) ? (hrs * e.progress) / 100 : 0);
