@@ -33,10 +33,13 @@ function verifyMuxSignature(rawBody: string, signatureHeader: string | null): bo
   const receivedDigest = parts["v1"];
   if (!timestamp || !receivedDigest) return false;
 
-  // Replay-attack guard: reject events older than 5 minutes
-  const eventAge = Math.floor(Date.now() / 1000) - parseInt(timestamp, 10);
-  if (eventAge > 300) {
-    console.warn(`Mux webhook too old: ${eventAge}s`);
+  const parsedTimestamp = parseInt(timestamp, 10);
+  if (Number.isNaN(parsedTimestamp)) return false;
+
+  // Replay-attack guard: reject events outside the allowed 5-minute clock skew
+  const eventAge = Math.floor(Date.now() / 1000) - parsedTimestamp;
+  if (Math.abs(eventAge) > 300) {
+    console.warn(`Mux webhook timestamp outside allowed skew: ${eventAge}s`);
     return false;
   }
 
