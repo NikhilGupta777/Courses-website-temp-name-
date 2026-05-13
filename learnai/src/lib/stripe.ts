@@ -1,40 +1,80 @@
 import Stripe from "stripe";
+import { db } from "@/lib/db";
 
-// Singleton Stripe client — safe for serverless environments
+// ─── Issue #003 fix: never fall back to a hardcoded test key ─────────────────
+// If STRIPE_SECRET_KEY is missing at startup, throw early rather than silently
+// using a placeholder that would cause every Stripe call to fail in production.
+if (!process.env.STRIPE_SECRET_KEY && process.env.NODE_ENV === "production") {
+  throw new Error("STRIPE_SECRET_KEY environment variable is not set");
+}
+
+// ─── Issue #004 fix: use a valid, released Stripe API version ─────────────────
+// "2025-02-24.acacia" does not exist. Use the stable 2024-06-20 release.
+const STRIPE_API_VERSION = "2024-06-20" as const;
+
+// Singleton Stripe client — safe for serverless / edge environments
 const globalForStripe = globalThis as unknown as { stripe: Stripe | undefined };
 
 export const stripe =
   globalForStripe.stripe ??
   new Stripe(process.env.STRIPE_SECRET_KEY ?? "sk_test_placeholder", {
-    apiVersion: "2025-02-24.acacia",
+    apiVersion: STRIPE_API_VERSION,
     typescript: true,
   });
 
 if (process.env.NODE_ENV !== "production") globalForStripe.stripe = stripe;
 
-// ─── Price IDs (set in .env) ────────────────────────────────
+// ─── Price IDs (set in .env) ─────────────────────────────────────────────────
 export const STRIPE_PRICES = {
   PRO_MONTHLY: process.env.STRIPE_PRO_MONTHLY_PRICE_ID ?? "price_pro_monthly",
   PRO_ANNUAL:  process.env.STRIPE_PRO_ANNUAL_PRICE_ID  ?? "price_pro_annual",
 } as const;
 
-// ─── Helpers ────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Create or retrieve a Stripe Customer for a user */
+/**
+ * Issue #005 fix: look up the Stripe customer ID from the Subscription record
+ * first (stored by the webhook), then fall back to a live Stripe email search,
+ * and finally create a new customer — storing the ID so subsequent calls are O(1).
+ */
 export async function getOrCreateStripeCustomer(
   userId: string,
   email: string,
   name?: string | null
 ): Promise<string> {
-  // Check if customer already exists (search by email)
-  const existing = await stripe.customers.list({ email, limit: 1 });
-  if (existing.data.length > 0) return existing.data[0].id;
+  // 1. Check our DB first — fastest path
+  const existingSubscription = await db.subscription.findFirst({
+    where: { userId, stripeCustomerId: { not: null } },
+    select: { stripeCustomerId: true },
+  });
+  if (existingSubscription?.stripeCustomerId) {
+    return existingSubscription.stripeCustomerId;
+  }
 
+  // 2. Search Stripe by email (handles accounts created outside our flow)
+  const existing = await stripe.customers.list({ email, limit: 1 });
+  if (existing.data.length > 0) {
+    const customerId = existing.data[0].id;
+    // Persist so we don't hit Stripe again
+    await db.subscription.updateMany({
+      where: { userId },
+      data: { stripeCustomerId: customerId },
+    });
+    return customerId;
+  }
+
+  // 3. Create a fresh Stripe customer and persist immediately
   const customer = await stripe.customers.create({
     email,
     name: name ?? undefined,
     metadata: { userId },
   });
+
+  await db.subscription.updateMany({
+    where: { userId },
+    data: { stripeCustomerId: customer.id },
+  });
+
   return customer.id;
 }
 

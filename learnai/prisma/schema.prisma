@@ -222,6 +222,7 @@ model Lesson {
   videoUrl      String?
   muxAssetId    String?
   muxPlaybackId String?
+  videoStatus   String?    // "preparing" | "ready" | "errored" — synced via Mux webhook
   content       String?
   resourceUrl   String?
   moduleId      String
@@ -382,7 +383,7 @@ model Payment {
   userId          String
   user            User          @relation(fields: [userId], references: [id])
   amount          Float
-  currency        String        @default("usd")
+  currency        String        @default("inr")
   status          PaymentStatus @default(PENDING)
   type            PaymentType
   stripePaymentId String?       @unique
@@ -423,6 +424,8 @@ model Subscription {
   updatedAt            DateTime           @updatedAt
 
   @@index([userId])
+  @@index([stripeSubscriptionId])
+  @@index([stripeCustomerId])
 }
 
 model Coupon {
