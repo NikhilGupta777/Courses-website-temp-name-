@@ -21,7 +21,15 @@ export const paymentRouter = router({
       if (course.isFree) throw new TRPCError({ code: "BAD_REQUEST", message: "Course is free — no payment needed" });
       if (!course.price) throw new TRPCError({ code: "BAD_REQUEST" });
 
-      const customerId = await getOrCreateStripeCustomer(user.id, user.email!, user.name);
+      // FIX #26: email may be null for some OAuth users — handle gracefully
+      if (!user.email) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "A verified email address is required to make a purchase. Please add an email to your account.",
+        });
+      }
+
+      const customerId = await getOrCreateStripeCustomer(user.id, user.email, user.name);
       const url = await createCourseCheckout({
         customerId,
         userId: user.id,
@@ -44,7 +52,15 @@ export const paymentRouter = router({
       const user = await ctx.db.user.findUnique({ where: { id: ctx.session.user.id } });
       if (!user) throw new TRPCError({ code: "NOT_FOUND" });
 
-      const customerId = await getOrCreateStripeCustomer(user.id, user.email!, user.name);
+      // FIX #26: email may be null for OAuth users without a verified email
+      if (!user.email) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "A verified email address is required. Please add an email to your account.",
+        });
+      }
+
+      const customerId = await getOrCreateStripeCustomer(user.id, user.email, user.name);
       const url = await createSubscriptionCheckout({
         customerId,
         userId: user.id,

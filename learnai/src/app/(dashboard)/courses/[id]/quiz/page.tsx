@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { COURSES } from "@/lib/data/courses";
 
 const mockQuiz = {
@@ -98,11 +98,23 @@ export default function QuizPage({ params }: { params: { id: string } }) {
   const [submitted, setSubmitted] = useState(false);
   const [timeLeft, setTimeLeft] = useState(quiz.timeLimit);
 
+  // FIX #5: handleSubmit was missing from the dependency array → stale closure bug.
+  // When the timer fired, it would call the stale version of handleSubmit that had
+  // captured the initial (empty) `selected` array, so the auto-submit on timeout
+  // would always submit with no answers. Using a ref avoids both the stale closure
+  // and an infinite re-render loop from adding a function to deps.
+  const handleSubmitRef = useRef(handleSubmit);
+  useEffect(() => { handleSubmitRef.current = handleSubmit; });
+
   useEffect(() => {
     if (submitted) return;
     const timer = setInterval(() => {
       setTimeLeft((t) => {
-        if (t <= 1) { clearInterval(timer); handleSubmit(); return 0; }
+        if (t <= 1) {
+          clearInterval(timer);
+          handleSubmitRef.current(); // always calls the latest version
+          return 0;
+        }
         return t - 1;
       });
     }, 1000);
