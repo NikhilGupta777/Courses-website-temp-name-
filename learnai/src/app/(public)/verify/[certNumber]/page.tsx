@@ -93,7 +93,7 @@ export default async function VerifyCertificatePage({ params }: Props) {
                   <div className="text-violet-200 text-sm mb-4">has successfully completed</div>
                   <div className="text-yellow-300 font-bold text-xl sm:text-2xl mb-4">{cert.courseTitle}</div>
                   <div className="flex items-center justify-center gap-6 text-xs text-violet-200 flex-wrap">
-                    {cert.score && <span>Score: <strong className="text-white">{cert.score}%</strong></span>}
+                    {cert.score != null && <span>Score: <strong className="text-white">{cert.score}%</strong></span>}
                     <span>Issued: <strong className="text-white">{cert.issuedAt}</strong></span>
                   </div>
                   <div className="mt-6 pt-4 border-t border-white/20 flex items-center justify-between text-xs text-violet-300">
