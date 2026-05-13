@@ -8,9 +8,11 @@ if (!process.env.STRIPE_SECRET_KEY && process.env.NODE_ENV === "production") {
   throw new Error("STRIPE_SECRET_KEY environment variable is not set");
 }
 
-// ─── Issue #004 fix: use a valid, released Stripe API version ─────────────────
-// "2025-02-24.acacia" does not exist. Use the stable 2024-06-20 release.
-const STRIPE_API_VERSION = "2024-06-20" as const;
+// ─── Stripe API version ──────────────────────────────────────────────────────
+// As of May 2026, the latest Stripe API version is "2026-03-25.dahlia".
+// Source: https://docs.stripe.com/changelog/dahlia
+// This version introduces flora-named API releases with additive-only subversions.
+const STRIPE_API_VERSION = "2026-03-25.dahlia" as const;
 
 // Singleton Stripe client — safe for serverless / edge environments
 const globalForStripe = globalThis as unknown as { stripe: Stripe | undefined };
