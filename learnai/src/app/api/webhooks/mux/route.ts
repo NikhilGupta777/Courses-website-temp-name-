@@ -1,17 +1,88 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import crypto from "crypto";
 
-// Mux video asset webhooks — fired when video processing completes
+// ─── Issue #011 fix: verify Mux webhook signature ────────────────────────────
+// Without verification, any HTTP client can POST fake "video.asset.ready" events
+// and flip lesson video status to "ready" for content that was never uploaded.
+//
+// Mux signs webhooks with HMAC-SHA256 using the secret from your Mux dashboard.
+// Header: mux-signature  value: "t=<timestamp>,v1=<hex-digest>"
+function verifyMuxSignature(rawBody: string, signatureHeader: string | null): boolean {
+  const secret = process.env.MUX_WEBHOOK_SECRET;
+  if (!secret) {
+    // No secret configured → only allow in development
+    if (process.env.NODE_ENV === "production") {
+      console.error("MUX_WEBHOOK_SECRET is not set — rejecting request in production");
+      return false;
+    }
+    console.warn("MUX_WEBHOOK_SECRET not configured — skipping verification in dev");
+    return true;
+  }
+
+  if (!signatureHeader) return false;
+
+  // Parse "t=<timestamp>,v1=<digest>"
+  const parts: Record<string, string> = {};
+  for (const part of signatureHeader.split(",")) {
+    const [key, val] = part.split("=");
+    if (key && val) parts[key.trim()] = val.trim();
+  }
+
+  const timestamp = parts["t"];
+  const receivedDigest = parts["v1"];
+  if (!timestamp || !receivedDigest) return false;
+
+  // Replay-attack guard: reject events older than 5 minutes
+  const eventAge = Math.floor(Date.now() / 1000) - parseInt(timestamp, 10);
+  if (eventAge > 300) {
+    console.warn(`Mux webhook too old: ${eventAge}s`);
+    return false;
+  }
+
+  // Compute expected HMAC
+  const payload = `${timestamp}.${rawBody}`;
+  const expectedDigest = crypto
+    .createHmac("sha256", secret)
+    .update(payload, "utf8")
+    .digest("hex");
+
+  // Constant-time comparison to prevent timing attacks
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(receivedDigest, "hex"),
+      Buffer.from(expectedDigest,  "hex")
+    );
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const { type, data } = body;
+  // Read raw text so we can verify the signature before parsing
+  const rawBody = await req.text();
+  const signatureHeader = req.headers.get("mux-signature");
+
+  if (!verifyMuxSignature(rawBody, signatureHeader)) {
+    console.error("Mux webhook signature verification failed");
+    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+  }
+
+  let parsedBody: { type: string; data: Record<string, any> };
+  try {
+    parsedBody = JSON.parse(rawBody);
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const { type, data } = parsedBody;
 
   try {
     switch (type) {
       // Video is ready to stream
       case "video.asset.ready": {
-        const { id: muxAssetId, playback_ids, status } = data;
-        const playbackId = playback_ids?.[0]?.id;
+        const { id: muxAssetId, playback_ids } = data;
+        const playbackId = playback_ids?.[0]?.id as string | undefined;
 
         if (muxAssetId && playbackId) {
           await db.lesson.updateMany({
@@ -29,24 +100,28 @@ export async function POST(req: NextRequest) {
       // Video processing failed
       case "video.asset.errored": {
         const { id: muxAssetId } = data;
-        await db.lesson.updateMany({
-          where: { muxAssetId },
-          data: { videoStatus: "errored" },
-        });
-        console.error(`Mux asset errored: ${muxAssetId}`);
+        if (muxAssetId) {
+          await db.lesson.updateMany({
+            where: { muxAssetId },
+            data: { videoStatus: "errored" },
+          });
+          console.error(`Mux asset errored: ${muxAssetId}`);
+        }
         break;
       }
 
       // Upload completed and asset was created
       case "video.upload.asset_created": {
-        const { upload_id, asset_id } = data;
-        await db.lesson.updateMany({
-          where: { videoUrl: upload_id },
-          data: {
-            muxAssetId: asset_id,
-            videoStatus: "preparing",
-          },
-        });
+        const { upload_id, asset_id } = data as { upload_id: string; asset_id: string };
+        if (upload_id && asset_id) {
+          await db.lesson.updateMany({
+            where: { videoUrl: upload_id },
+            data: {
+              muxAssetId: asset_id,
+              videoStatus: "preparing",
+            },
+          });
+        }
         break;
       }
 
