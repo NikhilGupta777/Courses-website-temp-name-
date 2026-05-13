@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { COURSES, LIVE_CLASSES, CATEGORY_COLORS } from "@/lib/data/courses";
 import { PLANS } from "@/lib/data/pricing";
+import { OrganisationJsonLd, WebSiteJsonLd } from "@/components/seo/json-ld";
 
 const stats = [
   { label: "Students Enrolled", value: "10,000+" },
@@ -86,7 +87,9 @@ export default function HomePage() {
 
   return (
     <div className="overflow-hidden">
-
+      {/* Structured data */}
+      <OrganisationJsonLd />
+      <WebSiteJsonLd />
 
       {/* ===== HERO ===== */}
       <section className="relative min-h-[92vh] flex items-center">

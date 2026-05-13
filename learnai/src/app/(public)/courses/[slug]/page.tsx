@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCourseBySlug, COURSES, CATEGORY_COLORS } from "@/lib/data/courses";
+import { CourseJsonLd, BreadcrumbJsonLd } from "@/components/seo/json-ld";
 
 const mockReviews = [
   { name: "Ravi Kumar", role: "Developer, Hyderabad", rating: 5, comment: "Absolutely brilliant course. Everything explained from scratch with real Indian context. The instructor is very clear and the content is up-to-date.", date: "2 weeks ago" },
@@ -24,6 +25,21 @@ export async function generateStaticParams() {
   return COURSES.map((c) => ({ slug: c.slug }));
 }
 
+export async function generateMetadata({ params }: { params: { slug: string } }) {
+  const course = getCourseBySlug(params.slug);
+  if (!course) return {};
+  return {
+    title: `${course.title} | LearnAI`,
+    description: course.subtitle ?? course.description.slice(0, 155),
+    openGraph: {
+      title: course.title,
+      description: course.subtitle ?? course.description.slice(0, 155),
+      type: "website",
+      url: `https://learnai.in/courses/${course.slug}`,
+    },
+  };
+}
+
 export default function CourseDetailPage({ params }: { params: { slug: string } }) {
   const course = getCourseBySlug(params.slug);
   if (!course) notFound();
@@ -35,6 +51,26 @@ export default function CourseDetailPage({ params }: { params: { slug: string } 
 
   return (
     <div className="min-h-screen bg-white">
+      {/* JSON-LD Structured Data */}
+      <CourseJsonLd
+        title={course.title}
+        description={course.description}
+        url={`https://learnai.in/courses/${course.slug}`}
+        instructor={course.instructor}
+        price={course.price}
+        isFree={course.isFree}
+        rating={course.rating}
+        reviewCount={course.totalReviews}
+        level={course.level}
+      />
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Home", url: "https://learnai.in" },
+          { name: "Courses", url: "https://learnai.in/courses" },
+          { name: course.title, url: `https://learnai.in/courses/${course.slug}` },
+        ]}
+      />
+
       {/* Hero */}
       <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
