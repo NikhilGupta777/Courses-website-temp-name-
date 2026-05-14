@@ -4,10 +4,6 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { trpc } from "@/lib/trpc/client";
 
-function SkeletonBar() {
-  return <div className="h-full w-full bg-gray-200 rounded-t-lg animate-pulse" />;
-}
-
 export default function AnalyticsPage() {
   const { data: analytics, isLoading } = useQuery(trpc.instructor.getAnalytics.queryOptions());
 

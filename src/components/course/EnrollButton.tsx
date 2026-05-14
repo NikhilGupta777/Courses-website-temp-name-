@@ -38,7 +38,7 @@ export function EnrollButton({
   className,
   label,
 }: EnrollButtonProps) {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const router = useRouter();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -55,7 +55,7 @@ export function EnrollButton({
   // ── Paid checkout mutation ──────────────────────────────────────────────
   const createCheckout = useMutation(trpc.payment.createCourseCheckout.mutationOptions({
     onSuccess: (data) => {
-      window.location.href = data.checkoutUrl;
+      window.location.assign(data.checkoutUrl);
     },
     onError: (err) => {
       setErrorMsg(err.message ?? "Could not start checkout. Please try again.");

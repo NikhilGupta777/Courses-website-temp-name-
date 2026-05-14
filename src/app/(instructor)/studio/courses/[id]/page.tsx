@@ -8,8 +8,6 @@ import { trpc } from "@/lib/trpc/client";
 import { VideoUpload } from "@/components/upload/VideoUpload";
 import { ImageUpload } from "@/components/upload/ImageUpload";
 
-type LessonType = "VIDEO" | "ARTICLE" | "QUIZ" | "ASSIGNMENT" | "LIVE_SESSION" | "RESOURCE";
-
 // ─── Grip / drag-handle icon ────────────────────────────────────────────────
 function GripIcon({ className }: { className?: string }) {
   return (
@@ -54,6 +52,7 @@ export default function CourseEditorPage() {
 
   useEffect(() => {
     if (course) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTitle(course.title);
       setSubtitle(course.subtitle ?? "");
       setDescription(course.description);

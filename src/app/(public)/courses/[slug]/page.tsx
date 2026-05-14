@@ -63,7 +63,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ s
         title={course.title}
         description={course.description}
         url={`https://learnai.in/courses/${course.slug}`}
-        instructor={{ name: instructorName, title: "", bio: course.instructor.bio }}
+        instructor={{ name: instructorName }}
         price={course.price ?? 0}
         isFree={course.isFree}
         rating={course.averageRating}

@@ -12,7 +12,6 @@
  */
 
 import { useState, useRef } from "react";
-import { cn } from "@/lib/utils";
 
 interface VideoUploadProps {
   lessonId: string;

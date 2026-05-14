@@ -36,7 +36,7 @@ export default function PayoutsPage() {
   // Stripe Connect onboarding
   const connectStripe = useMutation(trpc.instructor.connectStripe.mutationOptions({
     onSuccess: (data) => {
-      window.location.href = data.url;
+      window.location.assign(data.url);
     },
     onError: (err) => {
       alert(err.message ?? "Could not start Stripe onboarding");

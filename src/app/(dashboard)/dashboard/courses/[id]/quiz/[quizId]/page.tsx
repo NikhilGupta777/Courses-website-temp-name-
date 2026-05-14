@@ -1,13 +1,35 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { trpc } from "@/lib/trpc/client";
+import { trpc, trpcClient } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 
 type QuizState = "intro" | "in_progress" | "results";
+type QuizResult = {
+  score: number;
+  earnedPoints: number;
+  totalPoints: number;
+  passed: boolean;
+  questionResults: {
+    questionId: string;
+    userAnswer: string;
+    correct: boolean;
+    correctAnswer: string | null;
+    explanation: string | null;
+  }[];
+};
+type QuizSubmitInput = {
+  quizId: string;
+  answers: { questionId: string; answer: string }[];
+};
+type QuizQuestionForAnswer = {
+  id: string;
+  text?: string;
+  type: string;
+};
 
 // BUG #9 FIX: question.options from Prisma Json may already be a parsed object.
 // JSON.parse(object) throws "Unexpected token o". Safe-parse handles both.
@@ -33,33 +55,34 @@ export default function QuizPage() {
   const [multiSel,  setMultiSel]  = useState<Record<string, Set<string>>>({});
   const [timeLeft,  setTimeLeft]  = useState<number | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
-  const [result, setResult] = useState<{
-    score: number; earnedPoints: number; totalPoints: number; passed: boolean;
-    questionResults: { questionId: string; userAnswer: string; correct: boolean; correctAnswer: string | null; explanation: string | null }[];
-  } | null>(null);
+  const [result, setResult] = useState<QuizResult | null>(null);
 
   // BUG #7 FIX: use a single ref-based timer — no timerStarted state in deps,
   // which was causing the cleanup to fire on every render and clear the interval.
   const timerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
   const isRunning   = useRef(false);
 
-  const { data: quiz, isLoading } = useQuery(trpc.quiz.get.queryOptions({ quizId }));
-
-  const submitMutation = useMutation(trpc.quiz.submit.mutationOptions({
-    onSuccess: (data) => {
-      stopTimer();
-      setResult(data);
-      setQuizState("results");
-    },
-  }));
-
-  function stopTimer() {
+  const stopTimer = useCallback(() => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
     isRunning.current = false;
-  }
+  }, []);
+
+  const { data: quiz, isLoading } = useQuery(trpc.quiz.get.queryOptions({ quizId }));
+
+  const submitMutation = useMutation<QuizResult, Error, QuizSubmitInput>({
+    mutationFn: (input) => trpcClient.quiz.submit.mutate(input) as Promise<QuizResult>,
+    onSuccess: (data) => {
+      setResult(data);
+      setQuizState("results");
+    },
+  });
+
+  useEffect(() => {
+    if (quizState === "results") stopTimer();
+  }, [quizState, stopTimer]);
 
   function startTimer(seconds: number) {
     if (isRunning.current) return;  // already running — don't double-start
@@ -80,11 +103,11 @@ export default function QuizPage() {
   // Keep handleSubmit in a ref so the timer closure always calls the latest version
   const handleSubmitRef = useRef<(() => void) | null>(null);
 
-  const handleSubmit = () => {
+  const handleSubmit = useCallback(() => {
     if (!quiz) return;
     stopTimer();
     const timeTaken = startedAt ? Math.round((Date.now() - startedAt) / 1000) : 0;
-    const answerList = quiz.questions.map((q) => ({
+    const answerList = (quiz.questions as QuizQuestionForAnswer[]).map((q) => ({
       questionId: q.id,
       answer: q.type === "MULTI_SELECT"
         ? Array.from(multiSel[q.id] ?? []).join(",")
@@ -92,11 +115,14 @@ export default function QuizPage() {
     }));
     submitMutation.mutate({ quizId, answers: answerList });
     void timeTaken; // used for display; backend calculates server-side
-  };
-  handleSubmitRef.current = handleSubmit;
+  }, [answers, multiSel, quiz, quizId, startedAt, stopTimer, submitMutation]);
+
+  useEffect(() => {
+    handleSubmitRef.current = handleSubmit;
+  }, [handleSubmit]);
 
   // Cleanup on unmount
-  useEffect(() => () => stopTimer(), []);
+  useEffect(() => () => stopTimer(), [stopTimer]);
 
   const formatTime = (s: number) =>
     `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
@@ -234,7 +260,7 @@ export default function QuizPage() {
           <div className="space-y-4">
             <h3 className="font-bold text-gray-900">Question Review</h3>
             {result.questionResults.map((qr, idx) => {
-              const q = quiz.questions.find(q => q.id === qr.questionId);
+              const q = (quiz.questions as QuizQuestionForAnswer[]).find(q => q.id === qr.questionId);
               return (
                 <div key={qr.questionId} className={cn("bg-white rounded-xl border p-4",
                   qr.correct ? "border-green-200" : "border-red-200")}>
@@ -282,7 +308,7 @@ export default function QuizPage() {
 
   const progress = ((currentQ + 1) / totalQ) * 100;
   // BUG #9 FIX: parseOptions handles both pre-parsed JSON objects and strings
-  const options = parseOptions(question.options);
+  const options = parseOptions((question as { options: unknown }).options);
 
   // Toggle a MULTI_SELECT answer
   const toggleMultiSelect = (questionId: string, optionId: string) => {
@@ -427,7 +453,7 @@ export default function QuizPage() {
 
         {/* Question dot navigation */}
         <div className="flex flex-wrap gap-2 mt-6 justify-center">
-          {quiz.questions.map((q, idx) => {
+          {(quiz.questions as QuizQuestionForAnswer[]).map((q, idx) => {
             const answered = q.type === "MULTI_SELECT"
               ? (multiSel[q.id]?.size ?? 0) > 0
               : !!answers[q.id];

@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { nanoid } from "nanoid";
 
@@ -235,7 +236,7 @@ async function main() {
         { text: "ChatGPT can access the internet by default.", type: "TRUE_FALSE" as const, options: null, correct: "false", pos: 3 },
       ];
       for (const q of qs) {
-        await db.question.create({ data: { quizId: quiz.id, type: q.type, text: q.text, options: q.options, correctAnswer: q.correct, points: 1, position: q.pos } });
+        await db.question.create({ data: { quizId: quiz.id, type: q.type, text: q.text, options: q.options ?? Prisma.JsonNull, correctAnswer: q.correct, points: 1, position: q.pos } });
       }
     }
   }

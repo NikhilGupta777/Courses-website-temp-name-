@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useSession } from "next-auth/react";
 import { useQuery } from "@tanstack/react-query";
 import { trpc } from "@/lib/trpc/client";
 
@@ -24,7 +23,6 @@ function SkeletonRow() {
 }
 
 export default function MyCoursesPage() {
-  const { data: session } = useSession();
   const [statusFilter, setStatusFilter] = useState("All");
   const [search, setSearch] = useState("");
 

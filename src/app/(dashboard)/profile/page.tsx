@@ -4,11 +4,18 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { trpc } from "@/lib/trpc/client";
+import { trpc, trpcClient } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 
 const TABS = ["Profile", "Account", "Billing", "Notifications"] as const;
 type Tab = typeof TABS[number];
+type PaymentHistoryItem = {
+  id: string;
+  type: string;
+  createdAt: Date | string;
+  amount: number;
+  status: string;
+};
 
 // ── Skeleton ────────────────────────────────────────────────────────────────
 function FieldSkeleton() {
@@ -21,6 +28,7 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<Tab>("Profile");
   const [saved, setSaved] = useState(false);
   const [prefsSaved, setPrefsSaved] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
 
   // ── Profile form state ──────────────────────────────────────────────────
   const [name, setName]         = useState("");
@@ -51,10 +59,12 @@ export default function ProfilePage() {
   const { data: notifPrefs } = useQuery(
     trpc.user.getNotificationPrefs.queryOptions()
   );
+  const payments = (paymentHistory?.payments ?? []) as PaymentHistoryItem[];
 
   // ── Populate form once profile loads ────────────────────────────────────
   useEffect(() => {
     if (profile) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setName(profile.name ?? "");
       setBio(profile.bio ?? "");
       setHeadline(profile.headline ?? "");
@@ -63,6 +73,7 @@ export default function ProfilePage() {
 
   // ── Populate notification prefs once loaded ──────────────────────────────
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (notifPrefs) setPrefs(notifPrefs);
   }, [notifPrefs]);
 
@@ -80,12 +91,6 @@ export default function ProfilePage() {
       queryClient.invalidateQueries(trpc.user.getNotificationPrefs.queryOptions());
       setPrefsSaved(true);
       setTimeout(() => setPrefsSaved(false), 3000);
-    },
-  }));
-
-  const getPortalUrl = useMutation(trpc.payment.getPortalUrl.mutationOptions({
-    onSuccess: (data) => {
-      window.location.href = data.portalUrl;
     },
   }));
 
@@ -131,14 +136,15 @@ export default function ProfilePage() {
     ? new Date(profile.createdAt).toLocaleDateString("en-IN", { month: "short", year: "numeric" })
     : null;
 
-  const notifItems = [
-    { key: "liveClassReminders"   as const, label: "Live class reminders",    desc: "Get notified 24h and 30 min before a live session" },
-    { key: "newCourseLaunches"    as const, label: "New course launches",      desc: "Be the first to know when new AI courses are added" },
-    { key: "quizResults"          as const, label: "Quiz results",             desc: "Receive a summary of your quiz performance" },
-    { key: "certificateIssued"    as const, label: "Certificate issued",       desc: "Get notified when a new certificate is ready" },
-    { key: "promotionalOffers"    as const, label: "Promotional offers",       desc: "Special discounts, coupons, and seasonal sales" },
-    { key: "weeklyProgressReport" as const, label: "Weekly progress report",   desc: "A weekly summary of your learning progress" },
-  ];
+  const handleManagePlan = async () => {
+    setPortalLoading(true);
+    try {
+      const data = await trpcClient.payment.getPortalUrl.query();
+      window.location.assign(data.portalUrl);
+    } finally {
+      setPortalLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 pt-16">
@@ -371,10 +377,10 @@ export default function ProfilePage() {
                             </Link>
                           )}
                           <button
-                            onClick={() => getPortalUrl.mutate()}
-                            disabled={getPortalUrl.isPending}
+                            onClick={handleManagePlan}
+                            disabled={portalLoading}
                             className="px-4 py-2 border border-gray-200 text-gray-600 text-xs font-semibold rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50">
-                            {getPortalUrl.isPending ? "Loading…" : "Manage / Cancel Plan"}
+                            {portalLoading ? "Loading…" : "Manage / Cancel Plan"}
                           </button>
                         </>
                       )}
@@ -392,13 +398,13 @@ export default function ProfilePage() {
                       <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />
                     ))}
                   </div>
-                ) : !paymentHistory?.payments.length ? (
+                ) : payments.length === 0 ? (
                   <div className="text-sm text-gray-400 text-center py-8 bg-gray-50 rounded-xl">
                     No payments yet.
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {paymentHistory.payments.map((p) => (
+                    {payments.map((p) => (
                       <div key={p.id} className="flex items-center justify-between py-3 border-b border-gray-50 last:border-0">
                         <div>
                           <div className="text-sm font-medium text-gray-900">
