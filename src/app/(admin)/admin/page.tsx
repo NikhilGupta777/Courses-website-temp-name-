@@ -9,6 +9,7 @@ const adminNav = [
   { href: "/admin/users", label: "Users" },
   { href: "/admin/courses", label: "Courses" },
   { href: "/admin/revenue", label: "Revenue" },
+  { href: "/admin/coupons", label: "Coupons" },
 ];
 
 const typeIcon: Record<string, { icon: string; bg: string; color: string }> = {
@@ -106,6 +107,7 @@ export default function AdminOverviewPage() {
                     { label: "Manage Users", href: "/admin/users", color: "bg-violet-50 text-violet-700 hover:bg-violet-100" },
                     { label: "Review Courses", href: "/admin/courses", color: "bg-indigo-50 text-indigo-700 hover:bg-indigo-100" },
                     { label: "Revenue Report", href: "/admin/revenue", color: "bg-green-50 text-green-700 hover:bg-green-100" },
+                    { label: "Coupon Manager", href: "/admin/coupons", color: "bg-amber-50 text-amber-700 hover:bg-amber-100" },
                   ].map((a) => (
                     <Link key={a.href} href={a.href}
                       className={`block w-full px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors ${a.color}`}>

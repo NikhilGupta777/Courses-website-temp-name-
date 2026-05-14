@@ -11,6 +11,8 @@ import { instructorRouter } from "./instructor";
 import { adminRouter } from "./admin";
 import { notificationRouter } from "./notification";
 import { quizRouter } from "./quiz";
+import { liveClassRouter } from "./liveClass";
+import { couponRouter } from "./coupon";
 
 export const appRouter = router({
   course: courseRouter,
@@ -25,6 +27,8 @@ export const appRouter = router({
   admin: adminRouter,
   notification: notificationRouter,
   quiz: quizRouter,
+  liveClass: liveClassRouter,
+  coupon: couponRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -5,7 +5,6 @@ import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { useQuery } from "@tanstack/react-query";
 import { trpc } from "@/lib/trpc/client";
-import { LIVE_CLASSES } from "@/lib/data/courses";
 
 const navLinks = [
   { href: "/dashboard", label: "Overview", icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" },
@@ -15,11 +14,37 @@ const navLinks = [
   { href: "/dashboard/profile", label: "Settings", icon: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" },
 ];
 
-const upcomingLive = LIVE_CLASSES.slice(0, 2);
-
 function SkeletonCard() {
   return <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 animate-pulse h-24" />;
 }
+
+type DashboardEnrollment = {
+  id: string;
+  status: string;
+  progress: number;
+  course: { id: string; title: string };
+};
+type DashboardCertificate = {
+  id: string;
+  certificateNumber: string;
+  issuedAt: Date | string;
+  course: { title: string };
+};
+type DashboardLiveClass = {
+  id: string;
+  title: string;
+  status: string;
+  scheduledAt: Date | string;
+  instructor: { displayName: string };
+};
+type RecommendedCourse = {
+  id: string;
+  slug: string;
+  title: string;
+  isFree: boolean;
+  price: number | null;
+  instructor: { displayName: string };
+};
 
 export default function DashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -28,10 +53,13 @@ export default function DashboardPage() {
 
   const { data, isLoading } = useQuery(trpc.user.getDashboard.queryOptions());
   const { data: recommended } = useQuery(trpc.course.getFeatured.queryOptions());
+  const { data: upcomingLive } = useQuery(trpc.liveClass.getUpcoming.queryOptions());
 
-  const enrollments = data?.enrollments ?? [];
-  const certificates = data?.certificates ?? [];
+  const enrollments = (data?.enrollments ?? []) as DashboardEnrollment[];
+  const certificates = (data?.certificates ?? []) as DashboardCertificate[];
   const stats = data?.stats;
+  const liveClasses = (upcomingLive ?? []) as DashboardLiveClass[];
+  const paidRecommended = ((recommended ?? []) as RecommendedCourse[]).filter((course) => !course.isFree);
 
   const statCards = [
     { label: "Courses Enrolled", value: stats?.totalEnrolled ?? 0, icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253", color: "bg-violet-50 text-violet-600" },
@@ -165,25 +193,33 @@ export default function DashboardPage() {
                 <Link href="/live" className="text-xs text-violet-600 font-medium hover:underline">View all →</Link>
               </div>
               <div className="space-y-3">
-                {upcomingLive.map((cls) => (
-                  <div key={cls.id} className={`bg-white rounded-2xl border p-4 shadow-sm ${cls.isLive ? "border-red-200" : "border-gray-100"}`}>
-                    {cls.isLive && (
-                      <div className="inline-flex items-center gap-1.5 bg-red-100 text-red-600 text-xs font-bold px-2 py-0.5 rounded-full mb-2">
-                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />LIVE NOW
-                      </div>
-                    )}
-                    <h3 className="text-sm font-semibold text-gray-900 line-clamp-1">{cls.title}</h3>
-                    <div className="mt-1.5 flex items-center gap-3 text-xs text-gray-500">
-                      <span>{cls.instructor}</span><span>·</span>
-                      <span>{new Date(cls.date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} at {cls.time}</span>
-                    </div>
-                    <div className="mt-3">
-                      <Link href="/live" className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${cls.isLive ? "bg-red-500 text-white hover:bg-red-600" : "bg-violet-100 text-violet-700 hover:bg-violet-200"}`}>
-                        {cls.isLive ? "Join Now" : "Join Session"}
-                      </Link>
-                    </div>
+                {liveClasses.length === 0 ? (
+                  <div className="bg-white border border-gray-100 rounded-2xl p-6 text-center text-gray-400 text-sm">
+                    No upcoming live sessions right now.
+                    <Link href="/live" className="block mt-2 text-violet-600 font-medium hover:underline">View all classes →</Link>
                   </div>
-                ))}
+                ) : liveClasses.map((cls) => {
+                  const isLive = cls.status === "LIVE";
+                  return (
+                    <div key={cls.id} className={`bg-white rounded-2xl border p-4 shadow-sm ${isLive ? "border-red-200" : "border-gray-100"}`}>
+                      {isLive && (
+                        <div className="inline-flex items-center gap-1.5 bg-red-100 text-red-600 text-xs font-bold px-2 py-0.5 rounded-full mb-2">
+                          <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />LIVE NOW
+                        </div>
+                      )}
+                      <h3 className="text-sm font-semibold text-gray-900 line-clamp-1">{cls.title}</h3>
+                      <div className="mt-1.5 flex items-center gap-3 text-xs text-gray-500">
+                        <span>{cls.instructor.displayName}</span><span>·</span>
+                        <span>{new Date(cls.scheduledAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
+                      </div>
+                      <div className="mt-3">
+                        <Link href="/live" className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${isLive ? "bg-red-500 text-white hover:bg-red-600" : "bg-violet-100 text-violet-700 hover:bg-violet-200"}`}>
+                          {isLive ? "Join Now" : "Join Session"}
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -217,11 +253,11 @@ export default function DashboardPage() {
           </div>
 
           {/* Recommended */}
-          {(recommended?.filter(c => !c.isFree) ?? []).length > 0 && (
+          {paidRecommended.length > 0 && (
             <div>
               <h2 className="text-lg font-bold text-gray-900 mb-4">Recommended for You</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {(recommended?.filter(c => !c.isFree) ?? []).slice(0,3).map((course) => (
+                {paidRecommended.slice(0,3).map((course) => (
                   <Link key={course.id} href={`/courses/${course.slug}`}>
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:shadow-md hover:border-violet-200 transition-all group">
                       <div className="flex items-start gap-3">

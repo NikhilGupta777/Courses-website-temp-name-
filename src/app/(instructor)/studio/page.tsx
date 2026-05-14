@@ -26,7 +26,7 @@ export default function StudioPage() {
   const [newIsFree, setNewIsFree] = useState(false);
 
   const { data: courses, isLoading: coursesLoading } = useQuery(trpc.instructor.getCourses.queryOptions());
-  const { data: profile, isLoading: profileLoading } = useQuery(trpc.instructor.getProfile.queryOptions());
+  const { data: profile } = useQuery(trpc.instructor.getProfile.queryOptions());
   const { data: analytics } = useQuery(trpc.instructor.getAnalytics.queryOptions());
   const { data: categories } = useQuery(trpc.course.getCategories.queryOptions());
 

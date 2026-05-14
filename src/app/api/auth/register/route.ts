@@ -99,6 +99,13 @@ export async function POST(req: NextRequest) {
       return createdUser;
     });
 
+    // BUG #10 FIX: send welcome email (fire-and-forget — don't block registration)
+    import("@/server/services/email").then(({ sendWelcomeEmail }) => {
+      sendWelcomeEmail(user.email, user.name ?? "there").catch((err) =>
+        console.error("Welcome email failed:", err)
+      );
+    });
+
     return NextResponse.json(
       { message: "Account created successfully", userId: user.id },
       { status: 201 }

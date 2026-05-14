@@ -107,6 +107,21 @@ export async function POST(req: NextRequest) {
               courseId,
             },
           });
+
+          // BUG #10 FIX: fire payment confirmation email (best-effort)
+          db.user.findUnique({ where: { id: userId }, select: { email: true, name: true } })
+            .then(async (u) => {
+              if (!u?.email) return;
+              const { sendPaymentConfirmation } = await import("@/server/services/email");
+              const course = await db.course.findUnique({ where: { id: courseId }, select: { title: true } });
+              sendPaymentConfirmation(
+                u.email,
+                u.name ?? "there",
+                `₹${amountInRupees.toLocaleString("en-IN")}`,
+                course?.title ?? "Course"
+              ).catch((err) => console.error("Payment email failed:", err));
+            })
+            .catch(() => { /* non-fatal */ });
         }
 
         if (planId && userId) {

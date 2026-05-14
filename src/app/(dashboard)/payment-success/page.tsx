@@ -3,65 +3,63 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { COURSES } from "@/lib/data/courses";
+import { useQuery } from "@tanstack/react-query";
+import { trpc } from "@/lib/trpc/client";
 
+// ── Deterministic confetti (no random — avoids SSR mismatch) ─────────────────
 const CONFETTI_COLORS = ["#7c3aed", "#4f46e5", "#10b981", "#f59e0b", "#ec4899"] as const;
 const CONFETTI_PARTICLES = Array.from({ length: 30 }, (_, i) => {
   const seed = i + 1;
   return {
-    left: `${(seed * 37) % 100}%`,
-    top: `${(seed * 53) % 100}%`,
-    backgroundColor: CONFETTI_COLORS[seed % CONFETTI_COLORS.length],
-    animationDelay: `${((seed * 17) % 20) / 10}s`,
+    left:              `${(seed * 37) % 100}%`,
+    top:               `${(seed * 53) % 100}%`,
+    backgroundColor:   CONFETTI_COLORS[seed % CONFETTI_COLORS.length],
+    animationDelay:    `${((seed * 17) % 20) / 10}s`,
     animationDuration: `${0.6 + ((seed * 13) % 10) / 10}s`,
-    opacity: 0.2 + ((seed * 19) % 8) / 10,
-    transform: `rotate(${(seed * 47) % 360}deg)`,
+    opacity:            0.2 + ((seed * 19) % 8) / 10,
+    transform:         `rotate(${(seed * 47) % 360}deg)`,
   };
 });
 
+// ── Inner component (uses useSearchParams — must be inside Suspense) ─────────
 function PaymentSuccessContent() {
-  const searchParams = useSearchParams();
+  const searchParams     = useSearchParams();
   const enrolledCourseId = searchParams.get("enrolled");
   const subscribed       = searchParams.get("subscribed") === "true";
 
-  const enrolledCourse = enrolledCourseId
-    ? COURSES.find((c) => c.id === enrolledCourseId)
-    : null;
+  // Fetch the real course from DB when a course ID is present
+  const { data: enrolledCourse, isLoading: courseLoading } = useQuery({
+    ...trpc.course.getById.queryOptions({ id: enrolledCourseId ?? "" }),
+    enabled: !!enrolledCourseId,
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-violet-50 via-white to-green-50 flex items-center justify-center px-4 py-16">
-      {/* Confetti particles */}
+      {/* Confetti */}
       <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden" aria-hidden="true">
         {CONFETTI_PARTICLES.map((style, i) => (
-          <div
-            key={i}
-            className="absolute w-3 h-3 rounded-sm animate-bounce"
-            style={style}
-          />
+          <div key={i} className="absolute w-3 h-3 rounded-sm animate-bounce" style={style} />
         ))}
       </div>
 
       <div className="max-w-lg w-full">
-        {subscribed ? (
-          /* ── Subscription success ── */
+        {/* ── Subscription success ────────────────────────────────────────── */}
+        {subscribed && (
           <div className="text-center">
             <div className="w-24 h-24 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-violet-500/30">
               <span className="text-4xl">🎉</span>
             </div>
             <h1 className="text-3xl font-bold text-gray-900 mb-3">You&apos;re now Pro!</h1>
-            <p className="text-gray-500 mb-2">
-              Welcome to LearnAI Pro. Your 7-day free trial has started.
-            </p>
+            <p className="text-gray-500 mb-2">Welcome to LearnAI Pro. Your 7-day free trial has started.</p>
             <p className="text-gray-400 text-sm mb-8">
-              You now have access to all 12+ courses, live classes, certificates, and the AI Tutor chatbot.
+              You now have access to all courses, live classes, certificates, and the AI Tutor chatbot.
             </p>
-
             <div className="grid grid-cols-2 gap-3 mb-8">
               {[
-                { icon: "📚", label: "All 12+ Courses", desc: "Unlimited access" },
-                { icon: "🎥", label: "Live Classes", desc: "Join & rewatch" },
-                { icon: "🏆", label: "Certificates", desc: "Shareable PDFs" },
-                { icon: "🤖", label: "AI Tutor", desc: "GPT-powered Q&A" },
+                { icon: "📚", label: "All Courses",    desc: "Unlimited access" },
+                { icon: "🎥", label: "Live Classes",   desc: "Join & rewatch" },
+                { icon: "🏆", label: "Certificates",   desc: "Shareable PDFs" },
+                { icon: "🤖", label: "AI Tutor",       desc: "GPT-powered Q&A" },
               ].map((feat) => (
                 <div key={feat.label} className="bg-white rounded-2xl p-4 border border-violet-100 shadow-sm text-left">
                   <div className="text-2xl mb-1">{feat.icon}</div>
@@ -70,7 +68,6 @@ function PaymentSuccessContent() {
                 </div>
               ))}
             </div>
-
             <div className="flex flex-col sm:flex-row gap-3">
               <Link href="/courses"
                 className="flex-1 py-3.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg text-center text-sm">
@@ -82,8 +79,10 @@ function PaymentSuccessContent() {
               </Link>
             </div>
           </div>
-        ) : enrolledCourse ? (
-          /* ── Course purchase success ── */
+        )}
+
+        {/* ── Course purchase success ──────────────────────────────────────── */}
+        {!subscribed && enrolledCourseId && (
           <div className="text-center">
             <div className="w-24 h-24 bg-gradient-to-br from-green-500 to-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-green-500/30">
               <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -91,29 +90,54 @@ function PaymentSuccessContent() {
               </svg>
             </div>
             <h1 className="text-3xl font-bold text-gray-900 mb-3">Payment Successful!</h1>
-            <p className="text-gray-500 mb-6">
-              You&apos;re now enrolled in <strong>{enrolledCourse.title}</strong>.
-              A receipt has been sent to your email.
-            </p>
 
-            {/* Course card */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6 flex items-center gap-4 text-left">
-              <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-violet-100 to-indigo-200 flex items-center justify-center flex-shrink-0">
-                <svg className="w-7 h-7 text-violet-600 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-gray-900 line-clamp-1">{enrolledCourse.title}</div>
-                <div className="text-sm text-gray-500 mt-0.5">by {enrolledCourse.instructor.name}</div>
-                <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-400">
-                  <span>{enrolledCourse.duration}</span>
-                  <span>·</span>
-                  <span>{enrolledCourse.totalLessons} lessons</span>
+            {courseLoading ? (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6 flex items-center gap-4 animate-pulse">
+                <div className="w-16 h-16 rounded-xl bg-gray-200 flex-shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-gray-200 rounded w-3/4" />
+                  <div className="h-3 bg-gray-200 rounded w-1/2" />
                 </div>
               </div>
-            </div>
+            ) : enrolledCourse ? (
+              <>
+                <p className="text-gray-500 mb-6">
+                  You&apos;re now enrolled in <strong>{enrolledCourse.title}</strong>.
+                  A receipt has been sent to your email.
+                </p>
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6 flex items-center gap-4 text-left">
+                  <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-violet-100 to-indigo-200 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-7 h-7 text-violet-600 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-gray-900 line-clamp-1">{enrolledCourse.title}</div>
+                    <div className="text-sm text-gray-500 mt-0.5">
+                      by {enrolledCourse.instructor?.displayName ?? "Instructor"}
+                    </div>
+                    <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-400">
+                      {enrolledCourse.duration && <span>{enrolledCourse.duration} min</span>}
+                      {enrolledCourse.modules && (
+                        <>
+                          <span>·</span>
+                          <span>
+                            {enrolledCourse.modules.reduce((acc, m) => acc + m.lessons.length, 0)} lessons
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="text-gray-500 mb-6">
+                Your purchase was completed. A receipt has been sent to your email.
+              </p>
+            )}
 
             <div className="flex flex-col sm:flex-row gap-3">
-              <Link href={`/dashboard/courses/${enrolledCourse.id}/learn`}
+              <Link href={`/dashboard/courses/${enrolledCourseId}/learn`}
                 className="flex-1 py-3.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-violet-700 hover:to-indigo-700 shadow-lg transition-all text-center text-sm">
                 Start Learning Now →
               </Link>
@@ -123,8 +147,10 @@ function PaymentSuccessContent() {
               </Link>
             </div>
           </div>
-        ) : (
-          /* ── Generic success ── */
+        )}
+
+        {/* ── Generic success (no enrolled ID, no subscribed) ─────────────── */}
+        {!subscribed && !enrolledCourseId && (
           <div className="text-center">
             <div className="w-24 h-24 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl">
               <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -140,12 +166,9 @@ function PaymentSuccessContent() {
           </div>
         )}
 
-        {/* Support note */}
         <p className="text-center text-xs text-gray-400 mt-8">
           Questions?{" "}
-          <a href="mailto:support@learnai.in" className="text-violet-600 hover:underline">
-            support@learnai.in
-          </a>
+          <a href="mailto:support@learnai.in" className="text-violet-600 hover:underline">support@learnai.in</a>
           {" "}· We respond within 4 business hours.
         </p>
       </div>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LIVE_CLASSES, CATEGORY_COLORS } from "@/lib/data/courses";
+import { CATEGORY_COLORS } from "@/lib/data/courses";
 import { PLANS } from "@/lib/data/pricing";
 import { OrganisationJsonLd, WebSiteJsonLd } from "@/components/seo/json-ld";
 import { trpcClient } from "@/lib/trpc/client";
@@ -83,14 +83,20 @@ function StarRating({ rating }: { rating: number }) {
 
 export default async function HomePage() {
   let featuredCourses: Awaited<ReturnType<typeof trpcClient.course.getFeatured.query>> = [];
+  let upcomingLive: Awaited<ReturnType<typeof trpcClient.liveClass.getUpcoming.query>> = [];
   try {
-    featuredCourses = await trpcClient.course.getFeatured.query();
+    [featuredCourses, upcomingLive] = await Promise.all([
+      trpcClient.course.getFeatured.query(),
+      trpcClient.liveClass.getUpcoming.query(),
+    ]);
   } catch {
     featuredCourses = [];
+    upcomingLive    = [];
   }
-  const freeCourses = featuredCourses.filter((c) => c.isFree);
+  const freeCourses  = featuredCourses.filter((c) => c.isFree);
   const paidFeatured = featuredCourses.filter((c) => !c.isFree);
-  const upcomingLive = LIVE_CLASSES.slice(0, 3);
+  // Show up to 3 sessions; use the first 3 real sessions or empty array
+  const liveSessions = upcomingLive.slice(0, 3);
 
   return (
     <div className="overflow-hidden">
@@ -368,55 +374,65 @@ export default async function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-            {upcomingLive.map((cls) => (
-              <div key={cls.id} className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-colors">
-                {cls.isLive && (
-                  <div className="inline-flex items-center gap-1.5 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full mb-3 animate-pulse">
-                    <span className="w-1.5 h-1.5 bg-white rounded-full" />
-                    LIVE NOW
-                  </div>
-                )}
-                <h3 className="font-semibold text-white text-sm leading-snug mb-3 line-clamp-2">{cls.title}</h3>
-                <div className="space-y-1.5 text-xs text-violet-200">
-                  <div className="flex items-center gap-2">
-                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                    {cls.instructor}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    {new Date(cls.date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} · {cls.time}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    {cls.seatsLeft} seats left
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <div className="w-full bg-white/20 rounded-full h-1.5 mb-3">
-                    <div
-                      className="bg-gradient-to-r from-violet-400 to-pink-400 h-1.5 rounded-full"
-                      style={{ width: `${Math.round(((cls.maxSeats - cls.seatsLeft) / cls.maxSeats) * 100)}%` }}
-                    />
-                  </div>
-                  <Link
-                    href="/live"
-                    className={`block text-center py-2 rounded-lg text-sm font-semibold transition-colors ${
-                      cls.isLive
-                        ? "bg-red-500 hover:bg-red-400 text-white"
-                        : "bg-white/20 hover:bg-white/30 text-white"
-                    }`}
-                  >
-                    {cls.isLive ? "Join Now →" : "Register Free"}
-                  </Link>
-                </div>
+            {liveSessions.length === 0 ? (
+              <div className="col-span-3 text-center py-12">
+                <p className="text-violet-300 text-sm">No upcoming live sessions right now. Check back soon!</p>
+                <Link href="/live" className="inline-block mt-4 px-5 py-2 bg-white/20 hover:bg-white/30 text-white text-sm font-semibold rounded-xl transition-colors">View All Sessions</Link>
               </div>
-            ))}
+            ) : liveSessions.map((cls) => {
+              const isLive       = cls.status === "LIVE";
+              const seatsLeft    = cls.maxSeats - cls._count.rsvps;
+              const seatsPercent = Math.round((cls._count.rsvps / cls.maxSeats) * 100);
+              return (
+                <div key={cls.id} className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-colors">
+                  {isLive && (
+                    <div className="inline-flex items-center gap-1.5 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full mb-3 animate-pulse">
+                      <span className="w-1.5 h-1.5 bg-white rounded-full" />
+                      LIVE NOW
+                    </div>
+                  )}
+                  <h3 className="font-semibold text-white text-sm leading-snug mb-3 line-clamp-2">{cls.title}</h3>
+                  <div className="space-y-1.5 text-xs text-violet-200">
+                    <div className="flex items-center gap-2">
+                      <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      {cls.instructor.displayName}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      {new Date(cls.scheduledAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} · {new Date(cls.scheduledAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} IST
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      {seatsLeft} seats left
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <div className="w-full bg-white/20 rounded-full h-1.5 mb-3">
+                      <div
+                        className="bg-gradient-to-r from-violet-400 to-pink-400 h-1.5 rounded-full"
+                        style={{ width: `${seatsPercent}%` }}
+                      />
+                    </div>
+                    <Link
+                      href="/live"
+                      className={`block text-center py-2 rounded-lg text-sm font-semibold transition-colors ${
+                        isLive
+                          ? "bg-red-500 hover:bg-red-400 text-white"
+                          : "bg-white/20 hover:bg-white/30 text-white"
+                      }`}
+                    >
+                      {isLive ? "Join Now →" : "Register Free"}
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           <div className="text-center">

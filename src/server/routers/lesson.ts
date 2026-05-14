@@ -82,4 +82,24 @@ export const lessonRouter = router({
       if (!lesson) throw new TRPCError({ code: "NOT_FOUND" });
       return lesson;
     }),
+
+  // BUG #6 FIX: save the Mux uploadId as videoUrl immediately after upload starts,
+  // so the Mux webhook (video.upload.asset_created) can find the lesson via
+  // `where: { videoUrl: upload_id }` and update muxAssetId + videoStatus.
+  saveVideoUrl: instructorProcedure
+    .input(z.object({ lessonId: z.string(), uploadId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const profile = await ctx.db.instructorProfile.findUnique({ where: { userId: ctx.session.user.id } });
+      if (!profile) throw new TRPCError({ code: "NOT_FOUND" });
+      const lesson = await ctx.db.lesson.findUnique({
+        where: { id: input.lessonId },
+        include: { module: { include: { course: true } } },
+      });
+      if (!lesson) throw new TRPCError({ code: "NOT_FOUND" });
+      if (lesson.module.course.instructorId !== profile.id) throw new TRPCError({ code: "FORBIDDEN" });
+      return ctx.db.lesson.update({
+        where: { id: input.lessonId },
+        data: { videoUrl: input.uploadId, videoStatus: "preparing" },
+      });
+    }),
 });
