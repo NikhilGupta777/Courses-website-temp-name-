@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
-    "test:security": "tsx tests/security-regressions.test.ts"
+    "test:security": "tsx tests/security-regressions.test.ts",
+    "test:routes": "tsx tests/route-regressions.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
