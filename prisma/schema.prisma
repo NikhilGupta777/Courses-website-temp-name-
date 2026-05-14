@@ -24,10 +24,11 @@ model User {
   image         String?
   password      String?
   role          UserRole  @default(STUDENT)
-  bio           String?
-  headline      String?
-  emailVerified DateTime?
-  isActive      Boolean   @default(true)
+  bio                 String?
+  headline            String?
+  notificationPrefs   Json?
+  emailVerified       DateTime?
+  isActive            Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

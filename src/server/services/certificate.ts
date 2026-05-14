@@ -40,9 +40,10 @@ export async function issueCertificateIfCompleted(userId: string, courseId: stri
   });
 
   const certNumber = `LEARNAI-${new Date().getFullYear()}-${nanoid(6).toUpperCase()}`;
-  const verificationUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? "https://learnai.in"}/verify/${certNumber}`;
+  const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://learnai.in";
+  const verificationUrl = `${APP_URL}/verify/${certNumber}`;
 
-  await db.certificate.create({
+  const newCert = await db.certificate.create({
     data: {
       userId,
       courseId,
@@ -55,6 +56,12 @@ export async function issueCertificateIfCompleted(userId: string, courseId: stri
         instructorName:  course.instructor.displayName,   // ← was incorrectly course.title
       },
     },
+  });
+
+  // Store the PDF/print URL so the Download button can link to it immediately
+  await db.certificate.update({
+    where: { id: newCert.id },
+    data: { pdfUrl: `${APP_URL}/api/certificates/${newCert.id}/pdf` },
   });
 
   // In-app notification
