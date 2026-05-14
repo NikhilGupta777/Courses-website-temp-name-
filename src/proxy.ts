@@ -1,54 +1,23 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
+import { sanitizeLoginCallbackUrl } from "@/lib/security";
 
 // ─── Issue #006 fix: do NOT import `auth` from lib/auth.ts in middleware ───────
 // lib/auth.ts uses PrismaAdapter which imports @prisma/client — a Node.js-only
 // module that crashes in the Edge runtime that Next.js uses for middleware.
-// Instead, we decode the JWT ourselves using jose (already installed by NextAuth)
-// which is Edge-compatible and zero-dependency.
-//
-// We read the session cookie that NextAuth writes and verify it with AUTH_SECRET.
-// This gives us the user's id and role without hitting the database or using
-// Node.js APIs, keeping the middleware fully Edge-compatible.
-
-import { jwtVerify, type JWTPayload } from "jose";
+// Use Auth.js' Edge-compatible token decoder so the proxy understands Auth.js
+// cookie formats without importing the Prisma-backed auth config.
 
 const PROTECTED_ROUTES  = ["/dashboard", "/certificates", "/profile"];
 const INSTRUCTOR_ROUTES = ["/studio", "/analytics", "/payouts"];
 const ADMIN_ROUTES      = ["/admin"];
 const AUTH_ROUTES       = ["/login", "/register", "/forgot-password"];
 
-// Cookie names used by Auth.js v5 (changes between http/https)
-const SESSION_COOKIE_NAMES = [
-  "authjs.session-token",
-  "__Secure-authjs.session-token",
-];
-
-interface SessionPayload extends JWTPayload {
-  id?:   string;
-  role?: string;
-  email?: string;
-}
-
-async function getSessionPayload(req: NextRequest): Promise<SessionPayload | null> {
+async function getSessionPayload(req: NextRequest) {
   const secret = process.env.AUTH_SECRET;
   if (!secret) return null;
-
-  for (const cookieName of SESSION_COOKIE_NAMES) {
-    const token = req.cookies.get(cookieName)?.value;
-    if (!token) continue;
-
-    try {
-      const secretBytes = new TextEncoder().encode(secret);
-      const { payload } = await jwtVerify(token, secretBytes);
-      return payload as SessionPayload;
-    } catch {
-      // Token invalid or expired — treat as logged out
-      continue;
-    }
-  }
-
-  return null;
+  return getToken({ req, secret });
 }
 
 export async function proxy(req: NextRequest) {
@@ -60,13 +29,15 @@ export async function proxy(req: NextRequest) {
 
   // ── Redirect logged-in users away from auth pages ──────────────────────────
   if (AUTH_ROUTES.some((r) => pathname.startsWith(r)) && isLoggedIn) {
-    return NextResponse.redirect(new URL("/dashboard", req.url));
+    const callbackUrl = sanitizeLoginCallbackUrl(req.nextUrl.searchParams.get("callbackUrl"));
+    const authRedirect = AUTH_ROUTES.some((r) => callbackUrl.startsWith(r)) ? "/dashboard" : callbackUrl;
+    return NextResponse.redirect(new URL(authRedirect, req.url));
   }
 
   // ── Protect dashboard / user routes ────────────────────────────────────────
   if (PROTECTED_ROUTES.some((r) => pathname.startsWith(r)) && !isLoggedIn) {
     const loginUrl = new URL("/login", req.url);
-    loginUrl.searchParams.set("callbackUrl", pathname);
+    loginUrl.searchParams.set("callbackUrl", `${pathname}${req.nextUrl.search}`);
     return NextResponse.redirect(loginUrl);
   }
 
