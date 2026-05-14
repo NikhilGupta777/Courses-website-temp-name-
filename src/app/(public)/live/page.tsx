@@ -156,7 +156,7 @@ export default async function LiveClassesPage() {
                         </div>
                       </div>
                       <Link
-                        href={isLive ? (cls.meetingUrl ?? "#") : "/register?plan=pro"}
+                        href="/register?plan=pro"
                         className={`block text-center py-2.5 rounded-xl text-sm font-semibold transition-all hover:scale-[1.02] ${
                           isLive
                             ? "bg-red-500 hover:bg-red-600 text-white shadow-md shadow-red-500/20"
@@ -235,7 +235,7 @@ export default async function LiveClassesPage() {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-gray-400">{rec._count.rsvps} attended</span>
-                      <Link href={rec.recordingUrl ?? "/register?plan=pro"} className="text-xs font-semibold text-violet-600 hover:text-violet-700">
+                      <Link href="/register?plan=pro" className="text-xs font-semibold text-violet-600 hover:text-violet-700">
                         Watch Recording →
                       </Link>
                     </div>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { escapeHtml } from "@/lib/security";
 import crypto from "crypto";
 
 const Schema = z.object({ email: z.string().email() });
@@ -83,6 +84,7 @@ export async function POST(req: NextRequest) {
       });
 
       const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? "https://learnai.in"}/reset-password?token=${token}`;
+      const greetingName = escapeHtml(user.name ?? "there");
 
       // ─── Fix #5: check Resend response status ─────────────────────────────
       // The original code awaited the fetch but never inspected res.ok, so a
@@ -105,7 +107,7 @@ export async function POST(req: NextRequest) {
                   <h1 style="color: white; margin: 0; font-size: 22px;">Reset your password</h1>
                 </div>
                 <div style="background: #fff; padding: 32px; border-radius: 0 0 16px 16px; border: 1px solid #e5e7eb;">
-                  <p style="color: #374151; margin: 0 0 16px;">Hi ${user.name ?? "there"},</p>
+                  <p style="color: #374151; margin: 0 0 16px;">Hi ${greetingName},</p>
                   <p style="color: #6b7280; margin: 0 0 24px;">Click the button below to set a new password. This link expires in <strong>1 hour</strong>.</p>
                   <a href="${resetUrl}" style="display: inline-block; background: linear-gradient(135deg,#7c3aed,#4f46e5); color: white; padding: 14px 28px; border-radius: 12px; text-decoration: none; font-weight: bold;">Reset Password</a>
                   <p style="color: #9ca3af; font-size: 12px; margin: 24px 0 0;">If you did not request this, you can safely ignore this email.</p>

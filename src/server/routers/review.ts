@@ -11,6 +11,14 @@ export const reviewRouter = router({
       comment: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      const enrollment = await ctx.db.enrollment.findUnique({
+        where: { userId_courseId: { userId: ctx.session.user.id, courseId: input.courseId } },
+        select: { status: true },
+      });
+      if (enrollment?.status !== "ACTIVE" && enrollment?.status !== "COMPLETED") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "You must be enrolled to review this course" });
+      }
+
       const existing = await ctx.db.review.findUnique({ where: { userId_courseId: { userId: ctx.session.user.id, courseId: input.courseId } } });
       if (existing) throw new TRPCError({ code: "CONFLICT", message: "You have already reviewed this course" });
 

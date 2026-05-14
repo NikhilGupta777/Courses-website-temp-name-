@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import type { Prisma } from "@prisma/client";
-import { router, publicProcedure, instructorProcedure } from "@/lib/trpc/server";
+import { router, publicProcedure, protectedProcedure, instructorProcedure } from "@/lib/trpc/server";
 import { nanoid } from "nanoid";
 import { slugify } from "@/lib/utils";
+import { checkCourseAccess } from "@/server/services/enrollment";
 
 export const courseRouter = router({
   // Get all published courses with filters
@@ -128,10 +129,21 @@ export const courseRouter = router({
     });
   }),
 
-  // Get course by ID (for editor)
-  getById: publicProcedure
+  // Get course by ID for the instructor editor or an enrolled learner.
+  getById: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
+      const profile = await ctx.db.instructorProfile.findUnique({ where: { userId: ctx.session.user.id } });
+      const course = await ctx.db.course.findUnique({
+        where: { id: input.id },
+        select: { instructorId: true, status: true },
+      });
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const isOwner = !!profile && course.instructorId === profile.id;
+      const hasAccess = await checkCourseAccess(ctx.session.user.id, input.id);
+      if (!isOwner && !hasAccess) throw new TRPCError({ code: "FORBIDDEN" });
+
       return ctx.db.course.findUnique({
         where: { id: input.id },
         include: {
