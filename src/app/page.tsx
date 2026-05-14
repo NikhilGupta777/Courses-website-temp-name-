@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { COURSES, LIVE_CLASSES, CATEGORY_COLORS } from "@/lib/data/courses";
+import { LIVE_CLASSES, CATEGORY_COLORS } from "@/lib/data/courses";
 import { PLANS } from "@/lib/data/pricing";
 import { OrganisationJsonLd, WebSiteJsonLd } from "@/components/seo/json-ld";
+import { trpcClient } from "@/lib/trpc/client";
 
 const stats = [
   { label: "Students Enrolled", value: "10,000+" },
@@ -80,9 +81,15 @@ function StarRating({ rating }: { rating: number }) {
   );
 }
 
-export default function HomePage() {
-  const featuredCourses = COURSES.filter((c) => c.isFeatured).slice(0, 6);
-  const freeCourses = COURSES.filter((c) => c.isFree);
+export default async function HomePage() {
+  let featuredCourses: Awaited<ReturnType<typeof trpcClient.course.getFeatured.query>> = [];
+  try {
+    featuredCourses = await trpcClient.course.getFeatured.query();
+  } catch {
+    featuredCourses = [];
+  }
+  const freeCourses = featuredCourses.filter((c) => c.isFree);
+  const paidFeatured = featuredCourses.filter((c) => !c.isFree);
   const upcomingLive = LIVE_CLASSES.slice(0, 3);
 
   return (
@@ -222,7 +229,8 @@ export default function HomePage() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {freeCourses.map((course) => {
-              const colors = getCategoryColor(course.category);
+              const catSlug = course.category?.slug ?? "prompting";
+              const colors = getCategoryColor(catSlug);
               return (
                 <Link key={course.id} href={`/courses/${course.slug}`}>
                   <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-green-200 hover:shadow-lg hover:border-green-400 transition-all duration-200 group">
@@ -240,15 +248,12 @@ export default function HomePage() {
                     <div className="p-5">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-xs font-medium text-violet-600 bg-violet-50 px-2 py-0.5 rounded">{course.level}</span>
-                        <span className="text-xs text-gray-400">{course.duration}</span>
-                        <span className="text-xs text-gray-400">· {course.totalLessons} lessons</span>
                       </div>
                       <h3 className="font-semibold text-gray-900 group-hover:text-violet-600 transition-colors line-clamp-2">{course.title}</h3>
-                      <p className="text-xs text-gray-500 mt-1">by {course.instructor.name}</p>
+                      <p className="text-xs text-gray-500 mt-1">by {course.instructor.displayName}</p>
                       <div className="mt-3 flex items-center gap-2">
-                        <StarRating rating={course.rating} />
-                        <span className="text-xs font-medium text-gray-700">{course.rating}</span>
-                        <span className="text-xs text-gray-400">({course.totalReviews.toLocaleString()} reviews)</span>
+                        <StarRating rating={course.averageRating} />
+                        <span className="text-xs font-medium text-gray-700">{course.averageRating.toFixed(1)}</span>
                       </div>
                       <div className="mt-3 flex items-center justify-between">
                         <span className="text-lg font-bold text-green-600">Free</span>
@@ -273,10 +278,11 @@ export default function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {featuredCourses.map((course) => {
-              const colors = getCategoryColor(course.category);
-              const discount = course.originalPrice > 0
-                ? Math.round((1 - course.price / course.originalPrice) * 100)
+            {paidFeatured.map((course) => {
+              const catSlug = course.category?.slug ?? "prompting";
+              const colors = getCategoryColor(catSlug);
+              const discount = (course.originalPrice ?? 0) > (course.price ?? 0) && (course.originalPrice ?? 0) > 0
+                ? Math.round((1 - (course.price ?? 0) / (course.originalPrice ?? 1)) * 100)
                 : 0;
               return (
                 <Link key={course.id} href={`/courses/${course.slug}`}>
@@ -289,39 +295,19 @@ export default function HomePage() {
                           </svg>
                         </div>
                       </div>
-                      {course.badge && (
-                        <div className="absolute top-3 left-3">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                            course.badge === "Bestseller" ? "bg-orange-100 text-orange-700" :
-                            course.badge === "New" ? "bg-blue-100 text-blue-700" :
-                            course.badge === "Hot" ? "bg-red-100 text-red-700" :
-                            "bg-green-100 text-green-700"
-                          }`}>
-                            {course.badge}
-                          </span>
-                        </div>
-                      )}
-                      {course.deliveryMode === "HYBRID" && (
-                        <div className="absolute top-3 right-3">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-600 text-white">
-                            <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-                            LIVE
-                          </span>
-                        </div>
-                      )}
                     </div>
                     <div className="p-5 flex flex-col flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-xs font-medium text-violet-600 bg-violet-50 px-2 py-0.5 rounded">{course.level}</span>
-                        <span className="text-xs text-gray-400">{course.duration}</span>
+                        {course.category && <span className="text-xs text-gray-400">{course.category.name}</span>}
                       </div>
                       <h3 className="font-semibold text-gray-900 line-clamp-2 group-hover:text-violet-600 transition-colors flex-1">
                         {course.title}
                       </h3>
-                      <p className="mt-1 text-sm text-gray-500">{course.instructor.name}</p>
+                      <p className="mt-1 text-sm text-gray-500">{course.instructor.displayName}</p>
                       <div className="mt-3 flex items-center gap-2">
-                        <StarRating rating={course.rating} />
-                        <span className="text-xs font-medium text-gray-700">{course.rating}</span>
+                        <StarRating rating={course.averageRating} />
+                        <span className="text-xs font-medium text-gray-700">{course.averageRating.toFixed(1)}</span>
                         <span className="text-xs text-gray-400">({course.totalStudents.toLocaleString()})</span>
                       </div>
                       <div className="mt-4 flex items-center gap-2">
@@ -329,10 +315,10 @@ export default function HomePage() {
                           <span className="text-lg font-bold text-green-600">Free</span>
                         ) : (
                           <>
-                            <span className="text-lg font-bold text-gray-900">₹{course.price.toLocaleString("en-IN")}</span>
-                            {course.originalPrice > course.price && (
+                            <span className="text-lg font-bold text-gray-900">₹{(course.price ?? 0).toLocaleString("en-IN")}</span>
+                            {(course.originalPrice ?? 0) > (course.price ?? 0) && (
                               <>
-                                <span className="text-sm text-gray-400 line-through">₹{course.originalPrice.toLocaleString("en-IN")}</span>
+                                <span className="text-sm text-gray-400 line-through">₹{(course.originalPrice ?? 0).toLocaleString("en-IN")}</span>
                                 {discount > 0 && (
                                   <span className="text-xs font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded">
                                     {discount}% off

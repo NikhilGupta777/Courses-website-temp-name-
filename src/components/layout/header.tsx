@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { trpc } from "@/lib/trpc/client";
 
 const navigation = [
   { name: "Courses",      href: "/courses" },
@@ -14,11 +16,32 @@ const navigation = [
 export function Header() {
   const [mobileOpen,   setMobileOpen]   = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const queryClient = useQueryClient();
 
-  // FIX #1 / #16 / #17: read real session from Auth.js instead of MOCK_USER = null
   const { data: session, status } = useSession();
   const user = session?.user as (NonNullable<typeof session>["user"] & { role?: string }) | undefined;
   const isLoading = status === "loading";
+
+  const { data: unreadData } = useQuery({
+    ...trpc.notification.getUnreadCount.queryOptions(),
+    enabled: !!user,
+    refetchInterval: 30000,
+  });
+
+  const { data: notifications } = useQuery({
+    ...trpc.notification.getAll.queryOptions(),
+    enabled: !!user && notifOpen,
+  });
+
+  const markAllRead = useMutation(trpc.notification.markAllRead.mutationOptions({
+    onSuccess: () => {
+      queryClient.invalidateQueries(trpc.notification.getUnreadCount.queryOptions());
+      queryClient.invalidateQueries(trpc.notification.getAll.queryOptions());
+    },
+  }));
+
+  const unreadCount = unreadData?.count ?? 0;
 
   const handleSignOut = () => {
     setUserMenuOpen(false);
@@ -59,10 +82,53 @@ export function Header() {
               /* Skeleton while session loads */
               <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse" />
             ) : user ? (
-              /* ── Logged-in user dropdown ── */
-              <div className="relative">
-                <button
-                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+              /* ── Logged-in user: notification bell + dropdown ── */
+              <div className="flex items-center gap-2">
+                {/* Notification Bell */}
+                <div className="relative">
+                  <button onClick={() => { setNotifOpen(!notifOpen); setUserMenuOpen(false); }}
+                    className="relative p-2 rounded-xl hover:bg-gray-100 transition-colors">
+                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                    </svg>
+                    {unreadCount > 0 && (
+                      <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold">{unreadCount > 9 ? "9+" : unreadCount}</span>
+                    )}
+                  </button>
+                  {notifOpen && (
+                    <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden">
+                      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                        <h3 className="font-semibold text-gray-900 text-sm">Notifications</h3>
+                        {unreadCount > 0 && (
+                          <button onClick={() => markAllRead.mutate()} className="text-xs text-violet-600 hover:underline font-medium">
+                            Mark all read
+                          </button>
+                        )}
+                      </div>
+                      <div className="max-h-80 overflow-y-auto">
+                        {!notifications || notifications.length === 0 ? (
+                          <div className="px-4 py-8 text-center text-sm text-gray-400">No notifications yet</div>
+                        ) : notifications.map((n) => (
+                          <div key={n.id} className={`px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors ${!n.isRead ? "bg-violet-50/50" : ""}`}>
+                            <div className="flex items-start gap-3">
+                              <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${!n.isRead ? "bg-violet-500" : "bg-gray-300"}`} />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-semibold text-gray-900">{n.title}</p>
+                                <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.message}</p>
+                                <p className="text-xs text-gray-400 mt-1">{new Date(n.createdAt).toLocaleDateString("en-IN")}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* User Dropdown */}
+                <div className="relative">
+                  <button
+                    onClick={() => { setUserMenuOpen(!userMenuOpen); setNotifOpen(false); }}
                   aria-expanded={userMenuOpen}
                   aria-haspopup="true"
                   className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-gray-100 transition-colors"
@@ -128,6 +194,7 @@ export function Header() {
                     </div>
                   </div>
                 )}
+              </div>
               </div>
             ) : (
               /* ── Guest buttons ── */
@@ -202,8 +269,8 @@ export function Header() {
       </nav>
 
       {/* Close dropdown on backdrop click */}
-      {userMenuOpen && (
-        <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />
+      {(userMenuOpen || notifOpen) && (
+        <div className="fixed inset-0 z-40" onClick={() => { setUserMenuOpen(false); setNotifOpen(false); }} />
       )}
     </header>
   );
