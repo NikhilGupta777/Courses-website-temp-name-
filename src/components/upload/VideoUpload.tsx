@@ -20,6 +20,10 @@ interface VideoUploadProps {
   onUploadStart?: (uploadId: string) => void;
   onUploadComplete?: () => void;
   onError?: (message: string) => void;
+  /** Called immediately after getting the uploadId — should save it as lesson.videoUrl
+   *  so the Mux webhook (video.upload.asset_created) can find the lesson to update.
+   *  BUG #6 FIX: without this the webhook can never link the Mux asset back to the lesson. */
+  onSaveUploadId?: (uploadId: string) => Promise<void> | void;
 }
 
 type UploadState = "idle" | "requesting" | "uploading" | "processing" | "done" | "error";
@@ -30,6 +34,7 @@ export function VideoUpload({
   onUploadStart,
   onUploadComplete,
   onError,
+  onSaveUploadId,
 }: VideoUploadProps) {
   const [state, setState]       = useState<UploadState>(
     currentStatus === "ready" ? "done" :
@@ -80,6 +85,18 @@ export function VideoUpload({
       };
 
       onUploadStart?.(uploadId);
+
+      // BUG #6 FIX: persist the uploadId as lesson.videoUrl immediately so the
+      // Mux webhook handler (video.upload.asset_created) can match the upload
+      // back to this lesson via `where: { videoUrl: upload_id }`.
+      if (onSaveUploadId) {
+        try {
+          await onSaveUploadId(uploadId);
+        } catch (saveErr) {
+          console.error("Failed to save uploadId to lesson:", saveErr);
+          // Non-fatal — upload can still proceed; webhook matching may just fail
+        }
+      }
 
       // Dev mode — no real URL available
       if (!uploadUrl) {

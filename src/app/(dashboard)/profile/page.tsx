@@ -89,6 +89,17 @@ export default function ProfilePage() {
     },
   }));
 
+  // BUG #3 FIX: real delete account mutation
+  const deleteAccount = useMutation(trpc.user.deleteAccount.mutationOptions({
+    onSuccess: () => {
+      // Sign out after deleting account
+      import("next-auth/react").then(({ signOut }) => signOut({ callbackUrl: "/" }));
+    },
+  }));
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+
   const handleSaveProfile = () => {
     updateProfile.mutate({
       name:     name || undefined,
@@ -279,9 +290,41 @@ export default function ProfilePage() {
               <div className="border-t border-gray-100 pt-6">
                 <h3 className="font-semibold text-red-600 mb-1">Danger Zone</h3>
                 <p className="text-sm text-gray-500 mb-4">Once deleted, your account and all data cannot be recovered.</p>
-                <button className="px-5 py-2.5 border-2 border-red-200 text-red-600 font-semibold rounded-xl text-sm hover:bg-red-50 transition-colors">
-                  Delete My Account
-                </button>
+                {!showDeleteConfirm ? (
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="px-5 py-2.5 border-2 border-red-200 text-red-600 font-semibold rounded-xl text-sm hover:bg-red-50 transition-colors">
+                    Delete My Account
+                  </button>
+                ) : (
+                  <div className="space-y-3 max-w-sm bg-red-50 border border-red-200 rounded-xl p-4">
+                    <p className="text-sm font-semibold text-red-800">
+                      Type <span className="font-mono bg-red-100 px-1 rounded">DELETE MY ACCOUNT</span> to confirm
+                    </p>
+                    <input
+                      value={deleteConfirmText}
+                      onChange={(e) => setDeleteConfirmText(e.target.value)}
+                      placeholder="DELETE MY ACCOUNT"
+                      className="w-full px-3 py-2 border border-red-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400 font-mono"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => deleteAccount.mutate({ confirmation: "DELETE MY ACCOUNT" as const })}
+                        disabled={deleteConfirmText !== "DELETE MY ACCOUNT" || deleteAccount.isPending}
+                        className="px-4 py-2 bg-red-600 text-white text-xs font-semibold rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50">
+                        {deleteAccount.isPending ? "Deleting…" : "Permanently Delete"}
+                      </button>
+                      <button
+                        onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(""); }}
+                        className="px-4 py-2 border border-gray-200 text-gray-600 text-xs font-semibold rounded-lg hover:bg-gray-50 transition-colors">
+                        Cancel
+                      </button>
+                    </div>
+                    {deleteAccount.isError && (
+                      <p className="text-xs text-red-600">{deleteAccount.error?.message ?? "Delete failed."}</p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}

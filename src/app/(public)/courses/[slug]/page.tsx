@@ -4,6 +4,7 @@ import { trpcClient } from "@/lib/trpc/client";
 import { CATEGORY_COLORS } from "@/lib/data/courses";
 import { CourseJsonLd, BreadcrumbJsonLd } from "@/components/seo/json-ld";
 import { ReviewForm } from "@/components/course/ReviewForm";
+import { EnrollButton } from "@/components/course/EnrollButton";
 
 function StarRating({ rating }: { rating: number }) {
   return (
@@ -272,21 +273,17 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ s
                       </div>
                     )}
                   </div>
-                  {course.isFree ? (
-                    <Link href={`/dashboard/courses/${course.id}/learn`}
-                      className="block w-full text-center py-3.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-colors shadow-lg">
-                      Enroll Free — Start Now
-                    </Link>
-                  ) : (
-                    <div className="space-y-2">
-                      <Link href={`/register?plan=pro`}
-                        className="block w-full text-center py-3.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-semibold rounded-xl transition-all shadow-lg">
-                        Enroll Now
-                      </Link>
-                      <p className="text-center text-xs text-gray-500">
-                        Included in <Link href="/pricing" className="text-violet-600 font-medium hover:underline">Pro Plan ₹999/mo</Link>
-                      </p>
-                    </div>
+                  {/* BUG #4 + #5 FIX: EnrollButton handles real enrollment + checkout */}
+                  <EnrollButton
+                    courseId={course.id}
+                    courseSlug={course.slug}
+                    isFree={course.isFree}
+                    price={course.price}
+                  />
+                  {!course.isFree && (
+                    <p className="text-center text-xs text-gray-500 mt-2">
+                      Included in <Link href="/pricing" className="text-violet-600 font-medium hover:underline">Pro Plan ₹999/mo</Link>
+                    </p>
                   )}
                   <div>
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2.5">This course includes</p>

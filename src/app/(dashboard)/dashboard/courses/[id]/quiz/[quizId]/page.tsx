@@ -3,73 +3,105 @@
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
-import { useSession } from "next-auth/react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 
 type QuizState = "intro" | "in_progress" | "results";
 
+// BUG #9 FIX: question.options from Prisma Json may already be a parsed object.
+// JSON.parse(object) throws "Unexpected token o". Safe-parse handles both.
+type OptionShape = { id: string; text: string; isCorrect?: boolean };
+function parseOptions(raw: unknown): OptionShape[] | null {
+  if (!raw) return null;
+  if (Array.isArray(raw)) return raw as OptionShape[];
+  if (typeof raw === "string") {
+    try { return JSON.parse(raw) as OptionShape[]; } catch { return null; }
+  }
+  return null;
+}
+
 export default function QuizPage() {
-  const params = useParams();
+  const params   = useParams();
   const courseId = params.id as string;
-  const quizId = params.quizId as string;
-  const { data: session } = useSession();
+  const quizId   = params.quizId as string;
 
   const [quizState, setQuizState] = useState<QuizState>("intro");
-  const [currentQ, setCurrentQ] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [currentQ,  setCurrentQ]  = useState(0);
+  // multi-select answers stored as comma-separated selected option ids
+  const [answers,   setAnswers]   = useState<Record<string, string>>({});
+  const [multiSel,  setMultiSel]  = useState<Record<string, Set<string>>>({});
+  const [timeLeft,  setTimeLeft]  = useState<number | null>(null);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
   const [result, setResult] = useState<{
     score: number; earnedPoints: number; totalPoints: number; passed: boolean;
     questionResults: { questionId: string; userAnswer: string; correct: boolean; correctAnswer: string | null; explanation: string | null }[];
   } | null>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // BUG #7 FIX: use a single ref-based timer — no timerStarted state in deps,
+  // which was causing the cleanup to fire on every render and clear the interval.
+  const timerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isRunning   = useRef(false);
 
   const { data: quiz, isLoading } = useQuery(trpc.quiz.get.queryOptions({ quizId }));
 
   const submitMutation = useMutation(trpc.quiz.submit.mutationOptions({
     onSuccess: (data) => {
+      stopTimer();
       setResult(data);
       setQuizState("results");
-      if (timerRef.current) clearInterval(timerRef.current);
     },
   }));
 
-  useEffect(() => {
-    if (quizState === "in_progress" && quiz?.timeLimit && timeLeft === null) {
-      setTimeLeft(quiz.timeLimit * 60);
+  function stopTimer() {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
     }
-  }, [quizState, quiz]);
+    isRunning.current = false;
+  }
 
-  const [timerStarted, setTimerStarted] = useState(false);
+  function startTimer(seconds: number) {
+    if (isRunning.current) return;  // already running — don't double-start
+    isRunning.current = true;
+    setTimeLeft(seconds);
+    timerRef.current = setInterval(() => {
+      setTimeLeft((t) => {
+        if (t === null || t <= 1) {
+          stopTimer();
+          handleSubmitRef.current?.();
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+  }
 
-  useEffect(() => {
-    if (quizState === "in_progress" && timeLeft !== null && timeLeft > 0 && !timerStarted) {
-      setTimerStarted(true);
-      timerRef.current = setInterval(() => {
-        setTimeLeft(t => {
-          if (t === null || t <= 1) {
-            handleSubmit();
-            return 0;
-          }
-          return t - 1;
-        });
-      }, 1000);
-    }
-    return () => { if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; } };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quizState, timerStarted]);
+  // Keep handleSubmit in a ref so the timer closure always calls the latest version
+  const handleSubmitRef = useRef<(() => void) | null>(null);
 
   const handleSubmit = () => {
     if (!quiz) return;
-    const answerList = quiz.questions.map(q => ({
+    stopTimer();
+    const timeTaken = startedAt ? Math.round((Date.now() - startedAt) / 1000) : 0;
+    const answerList = quiz.questions.map((q) => ({
       questionId: q.id,
-      answer: answers[q.id] ?? "",
+      answer: q.type === "MULTI_SELECT"
+        ? Array.from(multiSel[q.id] ?? []).join(",")
+        : answers[q.id] ?? "",
     }));
     submitMutation.mutate({ quizId, answers: answerList });
+    void timeTaken; // used for display; backend calculates server-side
   };
+  handleSubmitRef.current = handleSubmit;
 
+  // Cleanup on unmount
+  useEffect(() => () => stopTimer(), []);
+
+  const formatTime = (s: number) =>
+    `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
+
+  // ── Loading / error states ────────────────────────────────────────────────
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -77,32 +109,36 @@ export default function QuizPage() {
       </div>
     );
   }
-
   if (!quiz) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-xl font-bold text-gray-900 mb-2">Quiz Not Found</h2>
-          <Link href={`/dashboard/courses/${courseId}/learn`} className="text-violet-600 hover:underline">← Back to Course</Link>
+          <Link href={`/dashboard/courses/${courseId}/learn`} className="text-violet-600 hover:underline">
+            ← Back to Course
+          </Link>
         </div>
       </div>
     );
   }
 
   const question = quiz.questions[currentQ];
-  const totalQ = quiz.questions.length;
-  const formatTime = (s: number) => `${Math.floor(s/60).toString().padStart(2,"0")}:${(s%60).toString().padStart(2,"0")}`;
+  const totalQ   = quiz.questions.length;
 
-  // INTRO
+  // ── INTRO ──────────────────────────────────────────────────────────────────
   if (quizState === "intro") {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-xl p-8 max-w-lg w-full">
           <div className="w-16 h-16 bg-violet-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <svg className="w-8 h-8 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
           </div>
           <h1 className="text-2xl font-bold text-gray-900 text-center mb-2">{quiz.title}</h1>
-          {quiz.description && <p className="text-gray-500 text-center text-sm mb-6">{quiz.description}</p>}
+          {quiz.description && (
+            <p className="text-gray-500 text-center text-sm mb-6">{quiz.description}</p>
+          )}
           <div className="grid grid-cols-3 gap-4 mb-8">
             <div className="text-center p-3 bg-gray-50 rounded-xl">
               <div className="text-xl font-bold text-gray-900">{totalQ}</div>
@@ -117,11 +153,20 @@ export default function QuizPage() {
               <div className="text-xs text-gray-500">Pass Score</div>
             </div>
           </div>
-          <button onClick={() => { setQuizState("in_progress"); if (quiz.timeLimit) setTimeLeft(quiz.timeLimit * 60); }}
-            className="w-full py-3.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg">
+          <button
+            onClick={() => {
+              setQuizState("in_progress");
+              setStartedAt(Date.now());
+              if (quiz.timeLimit) startTimer(quiz.timeLimit * 60);
+            }}
+            className="w-full py-3.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg"
+          >
             Start Quiz →
           </button>
-          <Link href={`/dashboard/courses/${courseId}/learn`} className="block text-center mt-3 text-sm text-gray-500 hover:text-violet-600 transition-colors">
+          <Link
+            href={`/dashboard/courses/${courseId}/learn`}
+            className="block text-center mt-3 text-sm text-gray-500 hover:text-violet-600 transition-colors"
+          >
             ← Back to Course
           </Link>
         </div>
@@ -129,60 +174,81 @@ export default function QuizPage() {
     );
   }
 
-  // RESULTS
+  // ── RESULTS ────────────────────────────────────────────────────────────────
   if (quizState === "results" && result) {
     return (
       <div className="min-h-screen bg-gray-50 py-10 px-4">
         <div className="max-w-2xl mx-auto">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-xl p-8 mb-6">
-            <div className={cn("w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4", result.passed ? "bg-green-100" : "bg-red-100")}>
+            <div className={cn("w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4",
+              result.passed ? "bg-green-100" : "bg-red-100")}>
               {result.passed ? (
-                <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
               ) : (
-                <svg className="w-10 h-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                <svg className="w-10 h-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
               )}
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 text-center mb-1">{result.passed ? "Congratulations!" : "Keep Practicing"}</h2>
-            <p className="text-gray-500 text-center mb-6">{result.passed ? "You passed the quiz!" : `You need ${quiz.passingScore}% to pass.`}</p>
+            <h2 className="text-2xl font-bold text-gray-900 text-center mb-1">
+              {result.passed ? "Congratulations!" : "Keep Practicing"}
+            </h2>
+            <p className="text-gray-500 text-center mb-6">
+              {result.passed ? "You passed the quiz!" : `You need ${quiz.passingScore}% to pass.`}
+            </p>
             <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="text-center p-4 bg-gray-50 rounded-xl">
-                <div className={cn("text-3xl font-bold", result.passed ? "text-green-600" : "text-red-500")}>{result.score}%</div>
-                <div className="text-xs text-gray-500 mt-0.5">Score</div>
-              </div>
-              <div className="text-center p-4 bg-gray-50 rounded-xl">
-                <div className="text-3xl font-bold text-gray-900">{result.earnedPoints}/{result.totalPoints}</div>
-                <div className="text-xs text-gray-500 mt-0.5">Points</div>
-              </div>
-              <div className="text-center p-4 bg-gray-50 rounded-xl">
-                <div className="text-3xl font-bold text-gray-900">{result.questionResults.filter(q => q.correct).length}/{totalQ}</div>
-                <div className="text-xs text-gray-500 mt-0.5">Correct</div>
-              </div>
+              {[
+                { label: "Score", value: `${result.score}%`, color: result.passed ? "text-green-600" : "text-red-500" },
+                { label: "Points", value: `${result.earnedPoints}/${result.totalPoints}`, color: "text-gray-900" },
+                { label: "Correct", value: `${result.questionResults.filter(q => q.correct).length}/${totalQ}`, color: "text-gray-900" },
+              ].map((s) => (
+                <div key={s.label} className="text-center p-4 bg-gray-50 rounded-xl">
+                  <div className={cn("text-3xl font-bold", s.color)}>{s.value}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">{s.label}</div>
+                </div>
+              ))}
             </div>
             <div className="flex gap-3">
-              <button onClick={() => { setAnswers({}); setCurrentQ(0); setResult(null); setTimeLeft(null); setQuizState("intro"); }}
-                className="flex-1 py-3 border border-gray-200 text-gray-600 font-semibold rounded-xl hover:bg-gray-50 transition-colors">
+              <button
+                onClick={() => {
+                  setAnswers({}); setMultiSel({}); setCurrentQ(0);
+                  setResult(null); setTimeLeft(null); setStartedAt(null);
+                  setQuizState("intro");
+                }}
+                className="flex-1 py-3 border border-gray-200 text-gray-600 font-semibold rounded-xl hover:bg-gray-50 transition-colors"
+              >
                 Retake Quiz
               </button>
-              <Link href={`/dashboard/courses/${courseId}/learn`}
-                className="flex-1 py-3 bg-violet-600 text-white font-semibold rounded-xl hover:bg-violet-700 transition-colors text-center">
+              <Link
+                href={`/dashboard/courses/${courseId}/learn`}
+                className="flex-1 py-3 bg-violet-600 text-white font-semibold rounded-xl hover:bg-violet-700 transition-colors text-center"
+              >
                 Back to Course
               </Link>
             </div>
           </div>
 
-          {/* Question breakdown */}
+          {/* Per-question breakdown */}
           <div className="space-y-4">
             <h3 className="font-bold text-gray-900">Question Review</h3>
             {result.questionResults.map((qr, idx) => {
               const q = quiz.questions.find(q => q.id === qr.questionId);
               return (
-                <div key={qr.questionId} className={cn("bg-white rounded-xl border p-4", qr.correct ? "border-green-200" : "border-red-200")}>
+                <div key={qr.questionId} className={cn("bg-white rounded-xl border p-4",
+                  qr.correct ? "border-green-200" : "border-red-200")}>
                   <div className="flex items-start gap-3">
-                    <div className={cn("w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5", qr.correct ? "bg-green-100" : "bg-red-100")}>
+                    <div className={cn("w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5",
+                      qr.correct ? "bg-green-100" : "bg-red-100")}>
                       {qr.correct ? (
-                        <svg className="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                        <svg className="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
                       ) : (
-                        <svg className="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        <svg className="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
                       )}
                     </div>
                     <div className="flex-1">
@@ -211,16 +277,25 @@ export default function QuizPage() {
     );
   }
 
-  // IN PROGRESS
+  // ── IN PROGRESS ────────────────────────────────────────────────────────────
   if (!question) return null;
 
   const progress = ((currentQ + 1) / totalQ) * 100;
-  type Option = { id: string; text: string; isCorrect?: boolean };
-  const options = question.options ? (JSON.parse(question.options as string) as Option[]) : null;
+  // BUG #9 FIX: parseOptions handles both pre-parsed JSON objects and strings
+  const options = parseOptions(question.options);
+
+  // Toggle a MULTI_SELECT answer
+  const toggleMultiSelect = (questionId: string, optionId: string) => {
+    setMultiSel((prev) => {
+      const current = new Set(prev[questionId] ?? []);
+      if (current.has(optionId)) { current.delete(optionId); } else { current.add(optionId); }
+      return { ...prev, [questionId]: current };
+    });
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Quiz header */}
+      {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -230,7 +305,8 @@ export default function QuizPage() {
             </div>
           </div>
           {timeLeft !== null && (
-            <div className={cn("text-sm font-mono font-bold px-3 py-1 rounded-lg", timeLeft < 60 ? "bg-red-100 text-red-600" : "bg-gray-100 text-gray-700")}>
+            <div className={cn("text-sm font-mono font-bold px-3 py-1 rounded-lg",
+              timeLeft < 60 ? "bg-red-100 text-red-600 animate-pulse" : "bg-gray-100 text-gray-700")}>
               {formatTime(timeLeft)}
             </div>
           )}
@@ -239,32 +315,76 @@ export default function QuizPage() {
 
       <div className="max-w-2xl mx-auto px-4 py-8">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2 py-0.5 bg-gray-100 rounded">
+              {question.type.replace(/_/g, " ")}
+            </span>
+            {question.points > 1 && (
+              <span className="text-xs text-violet-600 font-medium">{question.points} pts</span>
+            )}
+          </div>
           <p className="text-lg font-semibold text-gray-900 mb-6">{question.text}</p>
 
+          {/* TRUE_FALSE */}
           {question.type === "TRUE_FALSE" && (
             <div className="grid grid-cols-2 gap-3">
               {["true", "false"].map((v) => (
                 <button key={v} onClick={() => setAnswers(prev => ({ ...prev, [question.id]: v }))}
                   className={cn("py-4 rounded-xl border-2 font-semibold text-sm capitalize transition-all",
-                    answers[question.id] === v ? "border-violet-500 bg-violet-50 text-violet-700" : "border-gray-200 hover:border-violet-300 text-gray-700")}>
+                    answers[question.id] === v
+                      ? "border-violet-500 bg-violet-50 text-violet-700"
+                      : "border-gray-200 hover:border-violet-300 text-gray-700")}>
                   {v}
                 </button>
               ))}
             </div>
           )}
 
+          {/* MULTIPLE_CHOICE — single select */}
           {question.type === "MULTIPLE_CHOICE" && options && (
             <div className="space-y-3">
               {options.map((opt) => (
-                <button key={opt.id} onClick={() => setAnswers(prev => ({ ...prev, [question.id]: opt.id }))}
+                <button key={opt.id}
+                  onClick={() => setAnswers(prev => ({ ...prev, [question.id]: opt.id }))}
                   className={cn("w-full text-left px-4 py-3 rounded-xl border-2 text-sm transition-all",
-                    answers[question.id] === opt.id ? "border-violet-500 bg-violet-50 text-violet-700 font-medium" : "border-gray-200 hover:border-violet-300 text-gray-700")}>
+                    answers[question.id] === opt.id
+                      ? "border-violet-500 bg-violet-50 text-violet-700 font-medium"
+                      : "border-gray-200 hover:border-violet-300 text-gray-700")}>
                   <span className="font-semibold mr-2">{opt.id.toUpperCase()}.</span>{opt.text}
                 </button>
               ))}
             </div>
           )}
 
+          {/* BUG #8 FIX: MULTI_SELECT — checkbox-style multiple answers */}
+          {question.type === "MULTI_SELECT" && options && (
+            <div className="space-y-3">
+              <p className="text-xs text-gray-500 mb-2">Select all that apply</p>
+              {options.map((opt) => {
+                const selected = multiSel[question.id]?.has(opt.id) ?? false;
+                return (
+                  <button key={opt.id}
+                    onClick={() => toggleMultiSelect(question.id, opt.id)}
+                    className={cn("w-full text-left px-4 py-3 rounded-xl border-2 text-sm transition-all flex items-center gap-3",
+                      selected
+                        ? "border-violet-500 bg-violet-50 text-violet-700 font-medium"
+                        : "border-gray-200 hover:border-violet-300 text-gray-700")}>
+                    <div className={cn("w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0",
+                      selected ? "border-violet-500 bg-violet-500" : "border-gray-300")}>
+                      {selected && (
+                        <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 12 12">
+                          <path d="M10 3L5 8.5 2 5.5l-1 1L5 10.5l6-7.5-1-1z" />
+                        </svg>
+                      )}
+                    </div>
+                    <span className="font-semibold mr-1">{opt.id.toUpperCase()}.</span>{opt.text}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* SHORT_ANSWER */}
           {question.type === "SHORT_ANSWER" && (
             <textarea
               value={answers[question.id] ?? ""}
@@ -274,6 +394,17 @@ export default function QuizPage() {
               placeholder="Type your answer here..."
             />
           )}
+
+          {/* CODE (basic textarea) */}
+          {question.type === "CODE" && (
+            <textarea
+              value={answers[question.id] ?? ""}
+              onChange={(e) => setAnswers(prev => ({ ...prev, [question.id]: e.target.value }))}
+              rows={8}
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none bg-gray-900 text-green-400"
+              placeholder="// Write your code here..."
+            />
+          )}
         </div>
 
         <div className="flex items-center justify-between">
@@ -281,7 +412,6 @@ export default function QuizPage() {
             className="px-5 py-2.5 border border-gray-200 text-gray-600 font-semibold rounded-xl disabled:opacity-40 hover:bg-gray-50 transition-colors text-sm">
             ← Previous
           </button>
-
           {currentQ < totalQ - 1 ? (
             <button onClick={() => setCurrentQ(q => q + 1)}
               className="px-5 py-2.5 bg-violet-600 text-white font-semibold rounded-xl hover:bg-violet-700 transition-colors text-sm">
@@ -290,22 +420,27 @@ export default function QuizPage() {
           ) : (
             <button onClick={handleSubmit} disabled={submitMutation.isPending}
               className="px-6 py-2.5 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 transition-colors text-sm disabled:opacity-50">
-              {submitMutation.isPending ? "Submitting..." : "Submit Quiz ✓"}
+              {submitMutation.isPending ? "Submitting…" : "Submit Quiz ✓"}
             </button>
           )}
         </div>
 
-        {/* Question dots */}
+        {/* Question dot navigation */}
         <div className="flex flex-wrap gap-2 mt-6 justify-center">
-          {quiz.questions.map((_, idx) => (
-            <button key={idx} onClick={() => setCurrentQ(idx)}
-              className={cn("w-8 h-8 rounded-full text-xs font-semibold transition-all",
-                idx === currentQ ? "bg-violet-600 text-white" :
-                answers[quiz.questions[idx]!.id] ? "bg-violet-100 text-violet-700" :
-                "bg-gray-200 text-gray-600 hover:bg-gray-300")}>
-              {idx + 1}
-            </button>
-          ))}
+          {quiz.questions.map((q, idx) => {
+            const answered = q.type === "MULTI_SELECT"
+              ? (multiSel[q.id]?.size ?? 0) > 0
+              : !!answers[q.id];
+            return (
+              <button key={idx} onClick={() => setCurrentQ(idx)}
+                className={cn("w-8 h-8 rounded-full text-xs font-semibold transition-all",
+                  idx === currentQ ? "bg-violet-600 text-white" :
+                  answered ? "bg-violet-100 text-violet-700" :
+                  "bg-gray-200 text-gray-600 hover:bg-gray-300")}>
+                {idx + 1}
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>

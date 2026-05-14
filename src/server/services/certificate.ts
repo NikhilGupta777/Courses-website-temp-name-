@@ -64,6 +64,18 @@ export async function issueCertificateIfCompleted(userId: string, courseId: stri
     data: { pdfUrl: `${APP_URL}/api/certificates/${newCert.id}/pdf` },
   });
 
+  // BUG #10 FIX: send certificate email (fire-and-forget)
+  if (user?.name) {
+    const { sendCertificateEmail } = await import("./email");
+    sendCertificateEmail(
+      (await db.user.findUnique({ where: { id: userId }, select: { email: true } }))?.email ?? "",
+      user.name,
+      course.title,
+      certNumber,
+      verificationUrl
+    ).catch((err) => console.error("Certificate email failed:", err));
+  }
+
   // In-app notification
   await db.notification.create({
     data: {

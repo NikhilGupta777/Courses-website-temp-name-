@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { trpc } from "@/lib/trpc/client";
 
 const statusStyle: Record<string, string> = {
@@ -14,9 +14,23 @@ const statusStyle: Record<string, string> = {
 
 export default function PayoutsPage() {
   const [requestSent, setRequestSent] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const { data: payouts, isLoading } = useQuery(trpc.instructor.getPayouts.queryOptions());
   const { data: analytics }          = useQuery(trpc.instructor.getAnalytics.queryOptions());
+
+  // BUG #2 FIX: wire the real requestPayout mutation
+  const requestPayout = useMutation(trpc.instructor.requestPayout.mutationOptions({
+    onSuccess: () => {
+      setRequestSent(true);
+      setRequestError(null);
+      queryClient.invalidateQueries(trpc.instructor.getPayouts.queryOptions());
+    },
+    onError: (err) => {
+      setRequestError(err.message ?? "Request failed. Please try again.");
+    },
+  }));
 
   const payoutList = payouts ?? [];
   const totalEarned = payoutList
@@ -93,15 +107,23 @@ export default function PayoutsPage() {
               Request Submitted
             </div>
           ) : (
-            <button
-              onClick={() => setRequestSent(true)}
-              disabled={pending < 5000}
-              className="flex-shrink-0 px-6 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-md text-sm disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {pending >= 5000
-                ? `Request Payout — ₹${pending.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`
-                : "Minimum ₹5,000 required"}
-            </button>
+            <div className="flex flex-col items-end gap-2">
+              <button
+                onClick={() => {
+                  setRequestError(null);
+                  requestPayout.mutate({ amount: pending });
+                }}
+                disabled={pending < 5000 || requestPayout.isPending}
+                className="flex-shrink-0 px-6 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-md text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {requestPayout.isPending
+                  ? "Submitting…"
+                  : pending >= 5000
+                  ? `Request Payout — ₹${pending.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`
+                  : "Minimum ₹5,000 required"}
+              </button>
+              {requestError && <p className="text-xs text-red-500">{requestError}</p>}
+            </div>
           )}
         </div>
 

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "@/lib/trpc/server";
 
 const notifPrefsSchema = z.object({
@@ -120,5 +121,38 @@ export const userRouter = router({
         data: { notificationPrefs: input },
       });
       return { saved: true };
+    }),
+
+  // FIX BUG #3: real deleteAccount mutation
+  deleteAccount: protectedProcedure
+    .input(z.object({ confirmation: z.literal("DELETE MY ACCOUNT") }))
+    .mutation(async ({ ctx }) => {
+      const userId = ctx.session.user.id;
+
+      // Cascade delete: Prisma handles related records via onDelete: Cascade on FK
+      // We explicitly cancel Stripe subscriptions before deleting the user
+      const subscriptions = await ctx.db.subscription.findMany({
+        where: { userId, status: { in: ["ACTIVE", "TRIALING", "PAST_DUE"] } },
+        select: { stripeSubscriptionId: true },
+      });
+
+      // Best-effort Stripe cancellation (don't block account deletion on failure)
+      if (process.env.STRIPE_SECRET_KEY && subscriptions.length > 0) {
+        try {
+          const { stripe } = await import("@/lib/stripe");
+          await Promise.allSettled(
+            subscriptions
+              .filter((s) => s.stripeSubscriptionId)
+              .map((s) => stripe.subscriptions.cancel(s.stripeSubscriptionId!))
+          );
+        } catch (err) {
+          console.error("Failed to cancel Stripe subscriptions on account delete:", err);
+        }
+      }
+
+      // Hard delete — cascade removes sessions, accounts, enrollments, progress, etc.
+      await ctx.db.user.delete({ where: { id: userId } });
+
+      return { deleted: true };
     }),
 });
