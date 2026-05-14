@@ -2,6 +2,23 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure, protectedProcedure, instructorProcedure } from "@/lib/trpc/server";
 
+const liveClassPublicSelect = {
+  id: true,
+  title: true,
+  description: true,
+  topic: true,
+  platform: true,
+  scheduledAt: true,
+  durationMins: true,
+  maxSeats: true,
+  status: true,
+  isProOnly: true,
+  createdAt: true,
+  updatedAt: true,
+  instructor: { select: { displayName: true, bio: true } },
+  _count: { select: { rsvps: true } },
+} as const;
+
 export const liveClassRouter = router({
   // ── Public: upcoming live classes (scheduled + live, next 10) ────────────
   getUpcoming: publicProcedure.query(async ({ ctx }) => {
@@ -12,10 +29,7 @@ export const liveClassRouter = router({
       },
       orderBy: { scheduledAt: "asc" },
       take: 10,
-      include: {
-        instructor: { select: { displayName: true } },
-        _count: { select: { rsvps: true } },
-      },
+      select: liveClassPublicSelect,
     });
   }),
 
@@ -39,10 +53,7 @@ export const liveClassRouter = router({
           skip,
           take: limit,
           orderBy: { scheduledAt: "asc" },
-          include: {
-            instructor: { select: { displayName: true } },
-            _count: { select: { rsvps: true } },
-          },
+          select: liveClassPublicSelect,
         }),
       ]);
 
@@ -60,10 +71,7 @@ export const liveClassRouter = router({
     .query(async ({ ctx, input }) => {
       const liveClass = await ctx.db.liveClass.findUnique({
         where: { id: input.id },
-        include: {
-          instructor: { select: { displayName: true, bio: true } },
-          _count: { select: { rsvps: true } },
-        },
+        select: liveClassPublicSelect,
       });
       if (!liveClass) throw new TRPCError({ code: "NOT_FOUND", message: "Live class not found" });
       return liveClass;

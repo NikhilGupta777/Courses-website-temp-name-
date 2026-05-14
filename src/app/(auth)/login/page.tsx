@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { sanitizeLoginCallbackUrl } from "@/lib/security";
 
 // ─── FIX #4: useSearchParams() must be inside a Suspense boundary ─────────────
 // If the component that calls useSearchParams() is not wrapped in <Suspense>,
@@ -14,7 +15,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 function LoginForm() {
   const router       = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl  = searchParams.get("callbackUrl") ?? "/dashboard";
+  const callbackUrl  = sanitizeLoginCallbackUrl(searchParams.get("callbackUrl"));
 
   const [email,     setEmail]     = useState("");
   const [password,  setPassword]  = useState("");

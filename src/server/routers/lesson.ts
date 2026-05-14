@@ -63,23 +63,37 @@ export const lessonRouter = router({
       if (!profile) throw new TRPCError({ code: "NOT_FOUND" });
       const mod = await ctx.db.module.findUnique({ where: { id: input.moduleId }, include: { course: true } });
       if (!mod || mod.course.instructorId !== profile.id) throw new TRPCError({ code: "FORBIDDEN" });
-      await Promise.all(input.orderedIds.map((id, index) => ctx.db.lesson.update({ where: { id }, data: { position: index + 1 } })));
+      const uniqueIds = new Set(input.orderedIds);
+      if (uniqueIds.size !== input.orderedIds.length) throw new TRPCError({ code: "BAD_REQUEST", message: "Duplicate lesson IDs" });
+      const matchingLessons = await ctx.db.lesson.count({
+        where: { id: { in: input.orderedIds }, moduleId: input.moduleId },
+      });
+      if (matchingLessons !== input.orderedIds.length) throw new TRPCError({ code: "FORBIDDEN", message: "Invalid lesson order" });
+
+      await ctx.db.$transaction(
+        input.orderedIds.map((id, index) => ctx.db.lesson.update({ where: { id }, data: { position: index + 1 } }))
+      );
       return { success: true };
     }),
 
   getContent: protectedProcedure
     .input(z.object({ lessonId: z.string(), courseId: z.string() }))
     .query(async ({ ctx, input }) => {
-      const hasAccess = await checkCourseAccess(ctx.session.user.id, input.courseId);
-      if (!hasAccess) {
-        const lesson = await ctx.db.lesson.findUnique({ where: { id: input.lessonId }, select: { isFree: true } });
-        if (!lesson?.isFree) throw new TRPCError({ code: "FORBIDDEN", message: "You do not have access to this lesson" });
-      }
       const lesson = await ctx.db.lesson.findUnique({
         where: { id: input.lessonId },
-        include: { quiz: { include: { questions: { orderBy: { position: "asc" }, select: { id: true, type: true, text: true, options: true, points: true, position: true } } } } },
+        include: {
+          module: { include: { course: { select: { id: true, status: true } } } },
+          quiz: { include: { questions: { orderBy: { position: "asc" }, select: { id: true, type: true, text: true, options: true, points: true, position: true } } } },
+        },
       });
       if (!lesson) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const actualCourseId = lesson.module.courseId;
+      const hasAccess = await checkCourseAccess(ctx.session.user.id, actualCourseId);
+      if (!hasAccess) {
+        const canPreviewFreeLesson = lesson.isFree && lesson.isPublished && lesson.module.course.status === "PUBLISHED";
+        if (!canPreviewFreeLesson) throw new TRPCError({ code: "FORBIDDEN", message: "You do not have access to this lesson" });
+      }
       return lesson;
     }),
 

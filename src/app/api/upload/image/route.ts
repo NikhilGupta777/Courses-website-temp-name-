@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { parseAllowedImageUploadFolder } from "@/lib/security";
 import crypto from "crypto";
 
 /**
@@ -36,13 +37,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { filename, contentType, folder = "thumbnails" } = body;
+  const { filename, contentType } = body;
+  const folder = parseAllowedImageUploadFolder(body.folder);
 
   if (!filename || typeof filename !== "string") {
     return NextResponse.json({ error: "filename is required" }, { status: 400 });
   }
   if (!contentType || typeof contentType !== "string") {
     return NextResponse.json({ error: "contentType is required" }, { status: 400 });
+  }
+  if (!folder) {
+    return NextResponse.json({ error: "Invalid upload folder" }, { status: 400 });
   }
 
   const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -87,9 +92,8 @@ export async function POST(req: NextRequest) {
     const host        = new URL(endpoint).host;
     const uploadUrl   = `${endpoint}/${key}`;
 
-    // Canonical headers (only host for presigned URL)
-    const canonicalHeaders    = `host:${host}\n`;
-    const signedHeaders       = "host";
+    const canonicalHeaders    = `content-type:${contentType}\nhost:${host}\n`;
+    const signedHeaders       = "content-type;host";
     const credentialScope     = `${dateStamp}/${region}/${service}/aws4_request`;
     const credential          = `${S3_ACCESS_KEY}/${credentialScope}`;
 
