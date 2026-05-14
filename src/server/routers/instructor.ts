@@ -135,4 +135,49 @@ export const instructorRouter = router({
 
       return payout;
     }),
+
+  // ── Stripe Connect onboarding ─────────────────────────────────────────────
+  connectStripe: instructorProcedure.mutation(async ({ ctx }) => {
+    const profile = await ctx.db.instructorProfile.findUnique({
+      where: { userId: ctx.session.user.id },
+    });
+    if (!profile) throw new TRPCError({ code: "NOT_FOUND" });
+
+    if (!process.env.STRIPE_SECRET_KEY) {
+      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Stripe not configured" });
+    }
+
+    const { stripe } = await import("@/lib/stripe");
+    const user = await ctx.db.user.findUnique({
+      where: { id: ctx.session.user.id },
+      select: { email: true },
+    });
+
+    let accountId = profile.stripeAccountId;
+    if (!accountId) {
+      const account = await stripe.accounts.create({
+        type: "express",
+        email: user?.email ?? undefined,
+        metadata: {
+          instructorProfileId: profile.id,
+          userId: ctx.session.user.id,
+        },
+      });
+      accountId = account.id;
+      await ctx.db.instructorProfile.update({
+        where: { id: profile.id },
+        data: { stripeAccountId: accountId },
+      });
+    }
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://learnai.in";
+    const accountLink = await stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: `${appUrl}/payouts?stripe_refresh=true`,
+      return_url:  `${appUrl}/payouts?stripe_connected=true`,
+      type: "account_onboarding",
+    });
+
+    return { url: accountLink.url };
+  }),
 });

@@ -19,6 +19,7 @@ export default function PayoutsPage() {
 
   const { data: payouts, isLoading } = useQuery(trpc.instructor.getPayouts.queryOptions());
   const { data: analytics }          = useQuery(trpc.instructor.getAnalytics.queryOptions());
+  const { data: profile }            = useQuery(trpc.instructor.getProfile.queryOptions());
 
   // BUG #2 FIX: wire the real requestPayout mutation
   const requestPayout = useMutation(trpc.instructor.requestPayout.mutationOptions({
@@ -29,6 +30,16 @@ export default function PayoutsPage() {
     },
     onError: (err) => {
       setRequestError(err.message ?? "Request failed. Please try again.");
+    },
+  }));
+
+  // Stripe Connect onboarding
+  const connectStripe = useMutation(trpc.instructor.connectStripe.mutationOptions({
+    onSuccess: (data) => {
+      window.location.href = data.url;
+    },
+    onError: (err) => {
+      alert(err.message ?? "Could not start Stripe onboarding");
     },
   }));
 
@@ -59,6 +70,35 @@ export default function PayoutsPage() {
             <p className="text-gray-500 mt-1">You earn 70% of every course sale. Payouts on the 7th of every month.</p>
           </div>
         </div>
+
+        {/* Stripe Connect banner */}
+        {profile && !profile.stripeAccountId ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+              </svg>
+              <div>
+                <h3 className="font-bold text-amber-800 text-sm">Connect your bank account to receive payouts</h3>
+                <p className="text-xs text-amber-700 mt-0.5">Set up Stripe Connect to receive your earnings directly to your bank account.</p>
+              </div>
+            </div>
+            <button
+              onClick={() => connectStripe.mutate()}
+              disabled={connectStripe.isPending}
+              className="flex-shrink-0 inline-flex items-center gap-2 px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl text-sm transition-colors disabled:opacity-60"
+            >
+              {connectStripe.isPending ? "Connecting…" : "Connect Bank Account"}
+            </button>
+          </div>
+        ) : profile?.stripeAccountId ? (
+          <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-2xl p-4 mb-8">
+            <svg className="w-5 h-5 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-sm font-semibold text-green-800">✓ Bank account connected via Stripe</span>
+          </div>
+        ) : null}
 
         {/* Summary */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">

@@ -42,6 +42,7 @@ model User {
   notifications      Notification[]
   instructorProfile  InstructorProfile?
   progress           LessonProgress[]
+  liveClassRsvps     LiveClassRsvp[]
 
   @@index([email])
   @@index([role])
@@ -102,6 +103,7 @@ model InstructorProfile {
   user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   courses Course[]
   payouts Payout[]
+  liveClasses LiveClass[]
 }
 
 // ============================================
@@ -508,4 +510,54 @@ model Notification {
 
   @@index([userId, isRead])
   @@index([createdAt])
+}
+
+
+// ============================================
+// LIVE CLASSES (Phase 2)
+// ============================================
+
+enum LiveSessionStatus {
+  SCHEDULED
+  LIVE
+  COMPLETED
+  CANCELLED
+}
+
+model LiveClass {
+  id           String            @id @default(cuid())
+  title        String
+  description  String?
+  instructorId String
+  instructor   InstructorProfile @relation(fields: [instructorId], references: [id])
+  topic        String?
+  platform     String            @default("Zoom")
+  meetingUrl   String?
+  scheduledAt  DateTime
+  durationMins Int               @default(90)
+  maxSeats     Int               @default(500)
+  status       LiveSessionStatus @default(SCHEDULED)
+  recordingUrl String?
+  isProOnly    Boolean           @default(true)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  rsvps        LiveClassRsvp[]
+
+  @@index([scheduledAt])
+  @@index([status])
+  @@index([instructorId])
+}
+
+model LiveClassRsvp {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  liveClassId String
+  liveClass   LiveClass @relation(fields: [liveClassId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@unique([userId, liveClassId])
+  @@index([userId])
+  @@index([liveClassId])
 }

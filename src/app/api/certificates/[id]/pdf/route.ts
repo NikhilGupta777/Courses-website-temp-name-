@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
@@ -12,6 +12,7 @@ export async function GET(
   }
 
   const { id } = await params;
+  const download = req.nextUrl.searchParams.get("download") === "1";
 
   const cert = await db.certificate.findUnique({
     where: { id },
@@ -411,18 +412,26 @@ export async function GET(
   </button>
 
   <script>
-    // Auto-open print dialog after fonts load
-    window.addEventListener('load', function() {
-      setTimeout(function() { window.print(); }, 800);
-    });
+    // Only auto-open print dialog when not in download mode
+    var isDownload = new URLSearchParams(window.location.search).get('download') === '1';
+    if (!isDownload) {
+      window.addEventListener('load', function() {
+        setTimeout(function() { window.print(); }, 800);
+      });
+    }
   </script>
 </body>
 </html>`;
 
-  return new Response(html, {
-    headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": "private, no-cache",
-    },
-  });
+  const responseHeaders: Record<string, string> = {
+    "Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": "private, no-cache",
+  };
+
+  if (download) {
+    const safeCourseName = courseName.replace(/[^a-z0-9]/gi, "_").slice(0, 40);
+    responseHeaders["Content-Disposition"] = `attachment; filename="LearnAI_Certificate_${safeCourseName}.html"`;
+  }
+
+  return new Response(html, { headers: responseHeaders });
 }
