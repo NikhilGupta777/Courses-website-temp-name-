@@ -13,6 +13,7 @@ import { notificationRouter } from "./notification";
 import { quizRouter } from "./quiz";
 import { liveClassRouter } from "./liveClass";
 import { couponRouter } from "./coupon";
+import { aiTutorRouter } from "./aiTutor";
 
 export const appRouter = router({
   course: courseRouter,
@@ -29,6 +30,7 @@ export const appRouter = router({
   quiz: quizRouter,
   liveClass: liveClassRouter,
   coupon: couponRouter,
+  aiTutor: aiTutorRouter,
 });
 
 export type AppRouter = typeof appRouter;

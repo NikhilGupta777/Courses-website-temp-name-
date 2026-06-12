@@ -24,6 +24,79 @@ const DURATION_OPTIONS = [
 
 const PLATFORM_OPTIONS = ["Zoom", "Google Meet", "Teams", "Custom"];
 
+// ─── Inline editor for setting a recording URL on completed sessions ──────
+function RecordingUrlEditor({
+  id,
+  currentUrl,
+  onUpdate,
+  isPending,
+}: {
+  id: string;
+  currentUrl: string | null;
+  onUpdate: (id: string, url: string) => void;
+  isPending: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [url, setUrl] = useState(currentUrl ?? "");
+
+  if (!editing) {
+    return (
+      <div className="mt-1.5 flex items-center gap-2 text-xs">
+        {currentUrl ? (
+          <>
+            <a
+              href={currentUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-violet-600 hover:underline truncate max-w-[180px]"
+            >
+              📼 Recording linked
+            </a>
+            <button
+              onClick={() => setEditing(true)}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              edit
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => setEditing(true)}
+            className="text-violet-600 hover:underline"
+          >
+            + Add recording URL
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2 flex items-center gap-1.5">
+      <input
+        type="url"
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        placeholder="https://..."
+        className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-violet-500"
+      />
+      <button
+        onClick={() => { onUpdate(id, url); setEditing(false); }}
+        disabled={isPending}
+        className="px-2 py-1 text-xs font-semibold text-white bg-violet-600 rounded hover:bg-violet-700 transition-colors disabled:opacity-50"
+      >
+        Save
+      </button>
+      <button
+        onClick={() => { setEditing(false); setUrl(currentUrl ?? ""); }}
+        className="px-2 py-1 text-xs text-gray-400 hover:text-gray-600"
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
 interface ScheduleForm {
   title:        string;
   description:  string;
@@ -200,6 +273,14 @@ export default function InstructorLivePage() {
                       <td className="px-5 py-4">
                         <div className="font-medium text-gray-900 text-sm line-clamp-1 max-w-xs">{cls.title}</div>
                         {cls.topic && <div className="text-xs text-violet-600 mt-0.5">{cls.topic}</div>}
+                        {cls.status === "COMPLETED" && (
+                          <RecordingUrlEditor
+                            id={cls.id}
+                            currentUrl={cls.recordingUrl ?? null}
+                            onUpdate={(id, recordingUrl) => updateMutation.mutate({ id, recordingUrl })}
+                            isPending={updateMutation.isPending}
+                          />
+                        )}
                       </td>
                       <td className="px-5 py-4 text-sm text-gray-600 whitespace-nowrap">
                         <div>{new Date(cls.scheduledAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</div>

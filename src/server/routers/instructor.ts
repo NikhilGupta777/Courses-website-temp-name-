@@ -86,7 +86,51 @@ export const instructorRouter = router({
       };
     });
 
-    return { totalStudents: totalEnrollments, totalRevenue, courseStats, recentEnrollments };
+    // ── Build a real last-12-months enrollment + revenue time series ─────
+    // Pull all enrollments and completed payments from the past year and
+    // bucket them by YYYY-MM. This replaces the hacky last-10-rows chart.
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    oneYearAgo.setDate(1);
+    oneYearAgo.setHours(0, 0, 0, 0);
+
+    const [yearEnrollments, yearPayments] = await Promise.all([
+      ctx.db.enrollment.findMany({
+        where: { courseId: { in: courseIds }, enrolledAt: { gte: oneYearAgo } },
+        select: { enrolledAt: true },
+      }),
+      ctx.db.payment.findMany({
+        where: { courseId: { in: courseIds }, status: "COMPLETED", createdAt: { gte: oneYearAgo } },
+        select: { amount: true, createdAt: true },
+      }),
+    ]);
+
+    const monthly: Array<{ month: string; key: string; students: number; revenue: number }> = [];
+    const cursor = new Date(oneYearAgo);
+    for (let i = 0; i < 12; i++) {
+      const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`;
+      monthly.push({
+        month: cursor.toLocaleDateString("en-IN", { month: "short" }),
+        key,
+        students: 0,
+        revenue: 0,
+      });
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+    for (const e of yearEnrollments) {
+      const d = e.enrolledAt;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const slot = monthly.find((m) => m.key === key);
+      if (slot) slot.students++;
+    }
+    for (const p of yearPayments) {
+      const d = p.createdAt;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const slot = monthly.find((m) => m.key === key);
+      if (slot) slot.revenue += p.amount * 0.7;
+    }
+
+    return { totalStudents: totalEnrollments, totalRevenue, courseStats, recentEnrollments, monthly };
   }),
 
   getPayouts: instructorProcedure.query(async ({ ctx }) => {

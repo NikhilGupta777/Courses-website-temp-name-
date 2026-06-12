@@ -60,7 +60,12 @@ export const userRouter = router({
   getDashboard: protectedProcedure.query(async ({ ctx }) => {
     const userId = ctx.session.user.id;
 
-    const [enrollments, certificates, recentQuizzes, totalEnrolledCount] = await Promise.all([
+    // Pull the last 60 days of completed lessons in a single query so we can
+    // compute a real "current day streak" instead of a hardcoded number.
+    const sixtyDaysAgo = new Date();
+    sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+
+    const [enrollments, certificates, recentQuizzes, totalEnrolledCount, recentCompletions] = await Promise.all([
       ctx.db.enrollment.findMany({
         where: { userId },
         include: {
@@ -84,7 +89,44 @@ export const userRouter = router({
         take: 5,
       }),
       ctx.db.enrollment.count({ where: { userId } }),
+      ctx.db.lessonProgress.findMany({
+        where: {
+          userId,
+          isCompleted: true,
+          completedAt: { gte: sixtyDaysAgo, not: null },
+        },
+        select: { completedAt: true },
+        orderBy: { completedAt: "desc" },
+      }),
     ]);
+
+    // ── Streak calculation ─────────────────────────────────────────────────
+    // A "day" is any day on which at least one lesson was completed.
+    // Streak = consecutive days ending today (or yesterday — counts as
+    // active so users don't lose their streak before they log in).
+    const completionDays = new Set<string>();
+    for (const c of recentCompletions) {
+      if (c.completedAt) {
+        completionDays.add(c.completedAt.toISOString().slice(0, 10));
+      }
+    }
+
+    let dayStreak = 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayKey = today.toISOString().slice(0, 10);
+    const yesterdayKey = new Date(today.getTime() - 86_400_000).toISOString().slice(0, 10);
+
+    if (completionDays.has(todayKey) || completionDays.has(yesterdayKey)) {
+      // Walk back day by day until we hit a gap
+      const cursor = new Date(today);
+      // If they haven't completed anything today, start counting from yesterday
+      if (!completionDays.has(todayKey)) cursor.setDate(cursor.getDate() - 1);
+      while (completionDays.has(cursor.toISOString().slice(0, 10))) {
+        dayStreak++;
+        cursor.setDate(cursor.getDate() - 1);
+      }
+    }
 
     return {
       enrollments,
@@ -93,6 +135,7 @@ export const userRouter = router({
       stats: {
         totalEnrolled:     totalEnrolledCount,
         totalCertificates: certificates.length,
+        dayStreak,
       },
     };
   }),

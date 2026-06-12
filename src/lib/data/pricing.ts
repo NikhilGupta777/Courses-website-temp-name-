@@ -113,7 +113,7 @@ export const PLANS: Plan[] = [
 export const TRUST_BADGES = [
   "30-day money-back guarantee",
   "Cancel anytime",
-  "Secure payment via Razorpay",
+  "Secure payment via Stripe",
   "GST invoice provided",
 ];
 
@@ -126,7 +126,7 @@ export const PRICING_FAQ = [
   {
     question: "Which payment methods do you accept?",
     answer:
-      "We use Razorpay for all payments. You can pay via UPI (GPay, PhonePe, Paytm), all major credit/debit cards, net banking, and EMI options on select cards. No international card restrictions.",
+      "We use Stripe for all payments. You can pay via all major credit/debit cards (Visa, Mastercard, Rupay, Amex), UPI, and net banking. International cards are accepted with INR billing.",
   },
   {
     question: "Can I get a refund if I'm not satisfied?",

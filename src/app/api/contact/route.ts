@@ -1,6 +1,6 @@
 // POST /api/contact
 // Receives the contact form submission and sends it via email.
-// FIX #22: replaces the fake setTimeout in contact/page.tsx with a real API call.
+// FIX: rate-limited per IP and honeypot-protected to prevent spam.
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -9,10 +9,46 @@ const ContactSchema = z.object({
   email:   z.string().email(),
   reason:  z.string().min(1).max(100),
   message: z.string().min(10).max(2000),
+  // Honeypot: hidden field bots fill in but humans don't
+  website: z.string().optional(),
 });
+
+// ─── Simple in-memory rate limiter (5 submissions per IP per 10 minutes) ────
+// For multi-region/serverless deployments, swap with Upstash/Redis. Single
+// region serverless is fine for a contact form — abuse just gets dropped.
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const RATE_LIMIT_MAX = 5;
+const submissions = new Map<string, number[]>();
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const recent = (submissions.get(ip) ?? []).filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+  if (recent.length >= RATE_LIMIT_MAX) {
+    submissions.set(ip, recent);
+    return true;
+  }
+  recent.push(now);
+  submissions.set(ip, recent);
+  return false;
+}
+
+function getClientIp(req: NextRequest): string {
+  const fwd = req.headers.get("x-forwarded-for");
+  if (fwd) return fwd.split(",")[0]!.trim();
+  return req.headers.get("x-real-ip") ?? "unknown";
+}
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = getClientIp(req);
+
+    if (isRateLimited(ip)) {
+      return NextResponse.json(
+        { error: "Too many submissions. Please wait a few minutes and try again." },
+        { status: 429 }
+      );
+    }
+
     const body   = await req.json();
     const parsed = ContactSchema.safeParse(body);
 
@@ -23,7 +59,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { name, email, reason, message } = parsed.data;
+    const { name, email, reason, message, website } = parsed.data;
+
+    // Honeypot tripped — silently accept (bots think they succeeded)
+    if (website && website.trim().length > 0) {
+      console.warn(`[Contact] Honeypot triggered from ${ip}`);
+      return NextResponse.json({ success: true }, { status: 200 });
+    }
 
     // Escape for safe interpolation into email HTML
     const safe = (s: string) =>
@@ -48,6 +90,7 @@ export async function POST(req: NextRequest) {
               <tr><td style="padding: 8px; font-weight: bold; border: 1px solid #e5e7eb;">Email</td><td style="padding: 8px; border: 1px solid #e5e7eb;">${safe(email)}</td></tr>
               <tr><td style="padding: 8px; font-weight: bold; border: 1px solid #e5e7eb;">Reason</td><td style="padding: 8px; border: 1px solid #e5e7eb;">${safe(reason)}</td></tr>
               <tr><td style="padding: 8px; font-weight: bold; border: 1px solid #e5e7eb; vertical-align: top;">Message</td><td style="padding: 8px; border: 1px solid #e5e7eb; white-space: pre-wrap;">${safe(message)}</td></tr>
+              <tr><td style="padding: 8px; font-weight: bold; border: 1px solid #e5e7eb;">Source IP</td><td style="padding: 8px; border: 1px solid #e5e7eb; font-family: monospace; font-size: 12px;">${safe(ip)}</td></tr>
             </table>
           `,
         }),

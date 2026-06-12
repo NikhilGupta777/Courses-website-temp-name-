@@ -11,8 +11,10 @@ function getBaseUrl(): string {
     return v.startsWith("http") ? v : `https://${v}`;
   }
   if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
-  if (process.env.NODE_ENV !== "production") return "http://localhost:3000";
-  throw new Error("Unable to determine the app base URL. Set NEXT_PUBLIC_APP_URL or VERCEL_URL.");
+  // During `next build` the env may be unset; fall back to localhost so static
+  // page generation can still resolve. At runtime, NEXT_PUBLIC_APP_URL or
+  // VERCEL_URL should always be set in any real deployment.
+  return "http://localhost:3000";
 }
 
 // ─── Vanilla tRPC client (server-side usage, direct calls) ───────────────────

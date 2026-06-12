@@ -15,6 +15,7 @@ type PaymentHistoryItem = {
   createdAt: Date | string;
   amount: number;
   status: string;
+  course: { title: string; slug: string } | null;
 };
 
 // ── Skeleton ────────────────────────────────────────────────────────────────
@@ -408,7 +409,9 @@ export default function ProfilePage() {
                       <div key={p.id} className="flex items-center justify-between py-3 border-b border-gray-50 last:border-0">
                         <div>
                           <div className="text-sm font-medium text-gray-900">
-                            {p.type === "SUBSCRIPTION" ? "Subscription" : "Course Purchase"}
+                            {p.type === "SUBSCRIPTION"
+                              ? "Subscription"
+                              : p.course?.title ?? "Course Purchase"}
                           </div>
                           <div className="text-xs text-gray-400">
                             {new Date(p.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}

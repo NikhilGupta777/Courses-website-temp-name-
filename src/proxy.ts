@@ -3,11 +3,12 @@ import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { sanitizeLoginCallbackUrl } from "@/lib/security";
 
-// ─── Issue #006 fix: do NOT import `auth` from lib/auth.ts in middleware ───────
-// lib/auth.ts uses PrismaAdapter which imports @prisma/client — a Node.js-only
-// module that crashes in the Edge runtime that Next.js uses for middleware.
-// Use Auth.js' Edge-compatible token decoder so the proxy understands Auth.js
-// cookie formats without importing the Prisma-backed auth config.
+// ─── Auth-aware middleware ───────────────────────────────────────────────────
+// Note: do NOT import `auth` from lib/auth.ts here. lib/auth.ts uses
+// PrismaAdapter which imports @prisma/client — a Node.js-only module that
+// crashes in the Edge runtime that Next.js uses for middleware. Use Auth.js'
+// Edge-compatible token decoder so the middleware understands Auth.js cookie
+// formats without importing the Prisma-backed auth config.
 
 const PROTECTED_ROUTES  = ["/dashboard", "/certificates", "/profile"];
 const INSTRUCTOR_ROUTES = ["/studio", "/analytics", "/payouts"];
@@ -66,7 +67,7 @@ export async function proxy(req: NextRequest) {
 
 export const config = {
   matcher: [
-    // Skip static assets, images, favicon, and webhook routes (no auth needed there)
-    "/((?!_next/static|_next/image|favicon.ico|public|api/webhooks).*)",
+    // Skip static assets, images, favicon, webhooks, cron jobs, and tRPC API
+    "/((?!_next/static|_next/image|favicon.ico|public|api/webhooks|api/cron|api/trpc).*)",
   ],
 };

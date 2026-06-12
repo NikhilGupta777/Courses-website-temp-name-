@@ -20,7 +20,7 @@ const faqs = [
 ];
 
 export default function ContactPage() {
-  const [form, setForm] = useState({ name: "", email: "", reason: "", message: "" });
+  const [form, setForm] = useState({ name: "", email: "", reason: "", message: "", website: "" });
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -93,13 +93,24 @@ export default function ContactPage() {
                 </div>
                 <h3 className="text-xl font-bold text-green-800 mb-2">Message sent!</h3>
                 <p className="text-green-700 text-sm">We&apos;ll get back to you at <strong>{form.email}</strong> within 4 business hours.</p>
-                <button onClick={() => { setSent(false); setForm({ name: "", email: "", reason: "", message: "" }); }}
+                <button onClick={() => { setSent(false); setForm({ name: "", email: "", reason: "", message: "", website: "" }); }}
                   className="mt-6 px-6 py-2.5 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 transition-colors text-sm">
                   Send Another
                 </button>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-5">
+                {/* Honeypot — hidden from real users, but bots will fill it */}
+                <input
+                  type="text"
+                  name="website"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  value={form.website}
+                  onChange={(e) => setForm({ ...form, website: e.target.value })}
+                  style={{ position: "absolute", left: "-9999px", width: "1px", height: "1px", opacity: 0 }}
+                  aria-hidden="true"
+                />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Full Name *</label>

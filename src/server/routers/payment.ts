@@ -89,12 +89,13 @@ export const paymentRouter = router({
     return { portalUrl: url };
   }),
 
-  // Get payment history
+  // Get payment history (with course title looked up separately since
+  // Payment.courseId has no FK relation in schema)
   getHistory: protectedProcedure
     .input(z.object({ page: z.number().default(1), limit: z.number().default(10) }))
     .query(async ({ ctx, input }) => {
       const skip = (input.page - 1) * input.limit;
-      const [payments, total] = await Promise.all([
+      const [rawPayments, total] = await Promise.all([
         ctx.db.payment.findMany({
           where: { userId: ctx.session.user.id },
           orderBy: { createdAt: "desc" },
@@ -103,6 +104,24 @@ export const paymentRouter = router({
         }),
         ctx.db.payment.count({ where: { userId: ctx.session.user.id } }),
       ]);
+
+      // Hydrate course title/slug for course payments in a single query
+      const courseIds = Array.from(
+        new Set(rawPayments.map((p) => p.courseId).filter((id): id is string => !!id))
+      );
+      const courses = courseIds.length
+        ? await ctx.db.course.findMany({
+            where: { id: { in: courseIds } },
+            select: { id: true, title: true, slug: true },
+          })
+        : [];
+      const courseById = new Map(courses.map((c) => [c.id, c]));
+
+      const payments = rawPayments.map((p) => ({
+        ...p,
+        course: p.courseId ? courseById.get(p.courseId) ?? null : null,
+      }));
+
       return { payments, total, pages: Math.ceil(total / input.limit) };
     }),
 
