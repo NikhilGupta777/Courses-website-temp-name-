@@ -13,6 +13,11 @@ const liveClassPublicSelect = {
   maxSeats: true,
   status: true,
   isProOnly: true,
+  // SECURITY: the meeting and recording URLs are intentionally NOT exposed
+  // in this public select. They are only revealed via the Pro-gated
+  // procedures further below (getJoinLink / getRecordingLink). The UI
+  // surfaces a boolean `hasRecording` flag instead so it can show a
+  // "Watch Recording" CTA without leaking the URL itself.
   createdAt: true,
   updatedAt: true,
   instructor: { select: { displayName: true, bio: true } },
@@ -22,15 +27,20 @@ const liveClassPublicSelect = {
 export const liveClassRouter = router({
   // ── Public: upcoming live classes (scheduled + live, next 10) ────────────
   getUpcoming: publicProcedure.query(async ({ ctx }) => {
-    return ctx.db.liveClass.findMany({
+    const items = await ctx.db.liveClass.findMany({
       where: {
         scheduledAt: { gte: new Date() },
         status: { in: ["SCHEDULED", "LIVE"] },
       },
       orderBy: { scheduledAt: "asc" },
       take: 10,
-      select: liveClassPublicSelect,
+      select: { ...liveClassPublicSelect, recordingUrl: true },
     });
+    // Strip recordingUrl, expose hasRecording instead
+    return items.map(({ recordingUrl, ...rest }) => ({
+      ...rest,
+      hasRecording: !!recordingUrl,
+    }));
   }),
 
   // ── Public: paginated list with optional status filter ───────────────────
@@ -46,23 +56,23 @@ export const liveClassRouter = router({
 
       const where = status ? { status } : {};
 
-      const [total, items] = await Promise.all([
+      const [total, rawItems] = await Promise.all([
         ctx.db.liveClass.count({ where }),
         ctx.db.liveClass.findMany({
           where,
           skip,
           take: limit,
           orderBy: { scheduledAt: "asc" },
-          select: liveClassPublicSelect,
+          select: { ...liveClassPublicSelect, recordingUrl: true },
         }),
       ]);
 
-      return {
-        items,
-        total,
-        pages: Math.ceil(total / limit),
-        page,
-      };
+      const items = rawItems.map(({ recordingUrl, ...rest }) => ({
+        ...rest,
+        hasRecording: !!recordingUrl,
+      }));
+
+      return { items, total, pages: Math.ceil(total / limit), page };
     }),
 
   // ── Public: single live class by ID ──────────────────────────────────────
@@ -71,10 +81,79 @@ export const liveClassRouter = router({
     .query(async ({ ctx, input }) => {
       const liveClass = await ctx.db.liveClass.findUnique({
         where: { id: input.id },
-        select: liveClassPublicSelect,
+        select: { ...liveClassPublicSelect, recordingUrl: true },
       });
       if (!liveClass) throw new TRPCError({ code: "NOT_FOUND", message: "Live class not found" });
-      return liveClass;
+      const { recordingUrl, ...rest } = liveClass;
+      return { ...rest, hasRecording: !!recordingUrl };
+    }),
+
+  // ── Pro-gated: get the recording URL for a completed session ─────────────
+  // Returns the actual recordingUrl only to authenticated Pro/Annual/Enterprise
+  // subscribers. Free users get a FORBIDDEN error.
+  getRecordingUrl: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const sub = await ctx.db.subscription.findFirst({
+        where: {
+          userId: ctx.session.user.id,
+          status: { in: ["ACTIVE", "TRIALING"] },
+          plan: { in: ["PRO_MONTHLY", "PRO_ANNUAL", "ENTERPRISE"] },
+        },
+        select: { id: true },
+      });
+      if (!sub) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Recordings are a Pro feature. Upgrade to watch.",
+        });
+      }
+      const cls = await ctx.db.liveClass.findUnique({
+        where: { id: input.id },
+        select: { id: true, title: true, recordingUrl: true },
+      });
+      if (!cls?.recordingUrl) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Recording not available" });
+      }
+      return { id: cls.id, title: cls.title, recordingUrl: cls.recordingUrl };
+    }),
+
+  // ── Pro/RSVP-gated: get the live join URL for an upcoming session ────────
+  // Only RSVP'd users (or Pro subscribers if isProOnly) can fetch the link.
+  getJoinUrl: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const cls = await ctx.db.liveClass.findUnique({
+        where: { id: input.id },
+        select: { id: true, isProOnly: true, status: true, meetingUrl: true },
+      });
+      if (!cls) throw new TRPCError({ code: "NOT_FOUND" });
+      if (cls.status === "CANCELLED" || cls.status === "COMPLETED") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Session is not live" });
+      }
+
+      if (cls.isProOnly) {
+        const sub = await ctx.db.subscription.findFirst({
+          where: {
+            userId: ctx.session.user.id,
+            status: { in: ["ACTIVE", "TRIALING"] },
+            plan: { in: ["PRO_MONTHLY", "PRO_ANNUAL", "ENTERPRISE"] },
+          },
+          select: { id: true },
+        });
+        if (!sub) throw new TRPCError({ code: "FORBIDDEN", message: "Pro subscribers only" });
+      } else {
+        // Non-Pro session: still require an RSVP to share the join URL
+        const rsvp = await ctx.db.liveClassRsvp.findUnique({
+          where: { userId_liveClassId: { userId: ctx.session.user.id, liveClassId: input.id } },
+        });
+        if (!rsvp) throw new TRPCError({ code: "FORBIDDEN", message: "Please RSVP first" });
+      }
+
+      if (!cls.meetingUrl) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Meeting link not posted yet" });
+      }
+      return { joinUrl: cls.meetingUrl };
     }),
 
   // ── Instructor: create a new live class ──────────────────────────────────
@@ -122,6 +201,7 @@ export const liveClassRouter = router({
       topic:        z.string().optional(),
       platform:     z.string().optional(),
       meetingUrl:   z.string().url().optional().or(z.literal("")).optional(),
+      recordingUrl: z.string().url().optional().or(z.literal("")).optional(),
       scheduledAt:  z.string().optional(),
       durationMins: z.number().int().min(15).max(480).optional(),
       status:       z.enum(["SCHEDULED", "LIVE", "COMPLETED", "CANCELLED"]).optional(),
@@ -138,14 +218,15 @@ export const liveClassRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "You do not own this live class" });
       }
 
-      const { id, scheduledAt, meetingUrl, ...rest } = input;
+      const { id, scheduledAt, meetingUrl, recordingUrl, ...rest } = input;
 
       return ctx.db.liveClass.update({
         where: { id },
         data: {
           ...rest,
-          ...(scheduledAt ? { scheduledAt: new Date(scheduledAt) } : {}),
-          ...(meetingUrl !== undefined ? { meetingUrl: meetingUrl || null } : {}),
+          ...(scheduledAt    ? { scheduledAt: new Date(scheduledAt) } : {}),
+          ...(meetingUrl   !== undefined ? { meetingUrl:   meetingUrl   || null } : {}),
+          ...(recordingUrl !== undefined ? { recordingUrl: recordingUrl || null } : {}),
         },
       });
     }),
@@ -158,11 +239,40 @@ export const liveClassRouter = router({
 
       const liveClass = await ctx.db.liveClass.findUnique({
         where: { id: input.liveClassId },
-        select: { id: true, title: true, scheduledAt: true, status: true },
+        select: { id: true, title: true, scheduledAt: true, status: true, isProOnly: true, maxSeats: true, _count: { select: { rsvps: true } } },
       });
       if (!liveClass) throw new TRPCError({ code: "NOT_FOUND", message: "Live class not found" });
       if (liveClass.status === "CANCELLED") {
         throw new TRPCError({ code: "BAD_REQUEST", message: "This session has been cancelled" });
+      }
+      if (liveClass.status === "COMPLETED") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This session has already ended" });
+      }
+
+      // Pro-only gating: only Pro/Annual/Enterprise subscribers may RSVP
+      if (liveClass.isProOnly) {
+        const sub = await ctx.db.subscription.findFirst({
+          where: {
+            userId,
+            status: { in: ["ACTIVE", "TRIALING"] },
+            plan: { in: ["PRO_MONTHLY", "PRO_ANNUAL", "ENTERPRISE"] },
+          },
+          select: { id: true },
+        });
+        if (!sub) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "This live session is reserved for Pro members. Upgrade to RSVP.",
+          });
+        }
+      }
+
+      // Capacity check (only counts new RSVPs, not re-RSVP from same user)
+      const existing = await ctx.db.liveClassRsvp.findUnique({
+        where: { userId_liveClassId: { userId, liveClassId: input.liveClassId } },
+      });
+      if (!existing && liveClass._count.rsvps >= liveClass.maxSeats) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This session is fully booked" });
       }
 
       const rsvp = await ctx.db.liveClassRsvp.upsert({
@@ -171,16 +281,18 @@ export const liveClassRouter = router({
         update: {},
       });
 
-      // Create in-app reminder notification
-      await ctx.db.notification.create({
-        data: {
-          userId,
-          type:    "LIVE_SESSION_REMINDER",
-          title:   "📅 Live Class RSVP Confirmed",
-          message: `You're registered for "${liveClass.title}" on ${new Date(liveClass.scheduledAt).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}.`,
-          link:    `/live`,
-        },
-      });
+      // Create in-app reminder notification only on first RSVP
+      if (!existing) {
+        await ctx.db.notification.create({
+          data: {
+            userId,
+            type:    "LIVE_SESSION_REMINDER",
+            title:   "📅 Live Class RSVP Confirmed",
+            message: `You're registered for "${liveClass.title}" on ${new Date(liveClass.scheduledAt).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}.`,
+            link:    `/live`,
+          },
+        });
+      }
 
       return rsvp;
     }),

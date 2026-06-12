@@ -214,34 +214,49 @@ export default async function LiveClassesPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {pastRecordings.map((rec) => (
-                <div key={rec.id} className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow group">
-                  <div className="h-36 bg-gradient-to-br from-gray-800 to-gray-700 flex items-center justify-center relative">
-                    <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <svg className="w-5 h-5 text-violet-600 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
+              {pastRecordings.map((rec) => {
+                const hasRecording = rec.hasRecording;
+                return (
+                  <div key={rec.id} className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow group">
+                    <div className="h-36 bg-gradient-to-br from-gray-800 to-gray-700 flex items-center justify-center relative">
+                      <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <svg className="w-5 h-5 text-violet-600 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      </div>
+                      <div className="absolute bottom-3 right-3 bg-black/60 text-white text-xs px-2 py-0.5 rounded">
+                        {rec.durationMins} min
+                      </div>
+                      {!hasRecording && (
+                        <div className="absolute top-3 left-3 bg-yellow-400/90 text-yellow-900 text-[10px] font-bold px-2 py-0.5 rounded">
+                          PROCESSING
+                        </div>
+                      )}
                     </div>
-                    <div className="absolute bottom-3 right-3 bg-black/60 text-white text-xs px-2 py-0.5 rounded">
-                      {rec.durationMins} min
+                    <div className="p-4">
+                      <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 mb-1">{rec.title}</h3>
+                      {rec.topic && <p className="text-xs text-violet-600 mb-2">{rec.topic}</p>}
+                      <div className="flex items-center justify-between text-xs text-gray-400 mb-3">
+                        <span>{rec.instructor.displayName}</span>
+                        <span>{new Date(rec.scheduledAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-400">{rec._count.rsvps} attended</span>
+                        {hasRecording ? (
+                          <Link
+                            href={`/live/${rec.id}/watch`}
+                            className="text-xs font-semibold text-violet-600 hover:text-violet-700"
+                          >
+                            Watch Recording →
+                          </Link>
+                        ) : (
+                          <span className="text-xs text-gray-300">Recording soon…</span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div className="p-4">
-                    <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 mb-1">{rec.title}</h3>
-                    {rec.topic && <p className="text-xs text-violet-600 mb-2">{rec.topic}</p>}
-                    <div className="flex items-center justify-between text-xs text-gray-400 mb-3">
-                      <span>{rec.instructor.displayName}</span>
-                      <span>{new Date(rec.scheduledAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-400">{rec._count.rsvps} attended</span>
-                      <Link href="/register?plan=pro" className="text-xs font-semibold text-violet-600 hover:text-violet-700">
-                        Watch Recording →
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

@@ -7,18 +7,11 @@ import { trpc } from "@/lib/trpc/client";
 export default function AnalyticsPage() {
   const { data: analytics, isLoading } = useQuery(trpc.instructor.getAnalytics.queryOptions());
 
-  // Build month-by-month enrollment data from recentEnrollments
-  const monthlyMap = new Map<string, { students: number; revenue: number }>();
-  if (analytics?.recentEnrollments) {
-    analytics.recentEnrollments.forEach((e) => {
-      const key = new Date(e.enrolledAt).toLocaleDateString("en-IN", { month: "short" });
-      const existing = monthlyMap.get(key) ?? { students: 0, revenue: 0 };
-      monthlyMap.set(key, { students: existing.students + 1, revenue: existing.revenue });
-    });
-  }
-  // If no real monthly data yet, show zeroed-out structure
-  const monthlyData = monthlyMap.size > 0
-    ? Array.from(monthlyMap.entries()).map(([month, d]) => ({ month, ...d })).slice(-6)
+  // Real last-12-months enrollment + revenue series from the API
+  const monthly = analytics?.monthly ?? [];
+  // Show the last 6 months on the chart for readability
+  const monthlyData = monthly.length > 0
+    ? monthly.slice(-6).map((m) => ({ month: m.month, students: m.students, revenue: m.revenue }))
     : [
         { month: "Jan", students: 0, revenue: 0 },
         { month: "Feb", students: 0, revenue: 0 },

@@ -101,7 +101,7 @@ export async function createCourseCheckout({
       },
     ],
     metadata: { userId, courseId },
-    success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?enrolled=${courseId}`,
+    success_url: `${process.env.NEXT_PUBLIC_APP_URL}/payment-success?enrolled=${courseId}`,
     cancel_url:  `${process.env.NEXT_PUBLIC_APP_URL}/courses/${courseId}`,
     ...(couponId ? { discounts: [{ coupon: couponId }] } : {}),
   });
@@ -131,7 +131,7 @@ export async function createSubscriptionCheckout({
       trial_period_days: 7,
       metadata: { userId, plan },
     },
-    success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?subscribed=true`,
+    success_url: `${process.env.NEXT_PUBLIC_APP_URL}/payment-success?subscribed=true`,
     cancel_url:  `${process.env.NEXT_PUBLIC_APP_URL}/pricing`,
     ...(couponId ? { discounts: [{ coupon: couponId }] } : {}),
   });

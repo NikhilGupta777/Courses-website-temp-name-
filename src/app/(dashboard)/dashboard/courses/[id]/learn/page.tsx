@@ -8,6 +8,7 @@ import { trpc } from "@/lib/trpc/client";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
+import { MuxPlayer } from "@/components/course/MuxPlayer";
 
 export default function CoursePlayerPage() {
   const params = useParams();
@@ -224,27 +225,18 @@ export default function CoursePlayerPage() {
       );
     }
 
-    // Video is ready — render native HTML5 video with Mux HLS
-    const hlsUrl = `https://stream.mux.com/${muxPlaybackId}.m3u8`;
-    const mp4Url = `https://stream.mux.com/${muxPlaybackId}/high.mp4`;
-    const posterUrl = `https://image.mux.com/${muxPlaybackId}/thumbnail.jpg`;
+    // Video is ready — render the cross-browser MuxPlayer (handles HLS via hls.js)
+    const lastPosition =
+      (lessonData as { lastPosition?: number | null }).lastPosition ?? 0;
 
     return (
       <div className="aspect-video rounded-2xl overflow-hidden mb-4 bg-black">
-        <video
-          className="w-full rounded-2xl"
-          controls
-          playsInline
-          poster={posterUrl}
+        <MuxPlayer
+          playbackId={muxPlaybackId}
+          startTime={lastPosition}
           onTimeUpdate={handleTimeUpdate}
-          style={{ width: "100%", height: "100%" }}
-        >
-          {/* HLS for Safari / native HLS-capable browsers */}
-          <source src={hlsUrl} type="application/x-mpegURL" />
-          {/* MP4 fallback for browsers without native HLS */}
-          <source src={mp4Url} type="video/mp4" />
-          Your browser does not support the video tag.
-        </video>
+          className="w-full h-full"
+        />
       </div>
     );
   };

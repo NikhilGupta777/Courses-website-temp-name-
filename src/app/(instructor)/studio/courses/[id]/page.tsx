@@ -38,6 +38,7 @@ export default function CourseEditorPage() {
   const [subtitle, setSubtitle]         = useState("");
   const [description, setDescription]   = useState("");
   const [level, setLevel]               = useState("BEGINNER");
+  const [deliveryMode, setDeliveryMode] = useState<"LIVE_ONLINE" | "OFFLINE_WORKSHOP" | "PRE_RECORDED" | "HYBRID">("PRE_RECORDED");
   const [price, setPrice]               = useState("");
   const [originalPrice, setOriginalPrice] = useState("");
   const [isFree, setIsFree]             = useState(false);
@@ -57,6 +58,7 @@ export default function CourseEditorPage() {
       setSubtitle(course.subtitle ?? "");
       setDescription(course.description);
       setLevel(course.level);
+      setDeliveryMode(course.deliveryMode as "LIVE_ONLINE" | "OFFLINE_WORKSHOP" | "PRE_RECORDED" | "HYBRID");
       setPrice(course.price?.toString() ?? "");
       setOriginalPrice(course.originalPrice?.toString() ?? "");
       setIsFree(course.isFree);
@@ -106,6 +108,7 @@ export default function CourseEditorPage() {
       subtitle: subtitle || undefined,
       description,
       level: level as "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | "EXPERT",
+      deliveryMode,
       price: isFree ? 0 : (parseFloat(price) || undefined),
       originalPrice: parseFloat(originalPrice) || undefined,
       isFree,
@@ -314,10 +317,15 @@ export default function CourseEditorPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Delivery Mode</label>
-                  <select className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-500">
+                  <select
+                    value={deliveryMode}
+                    onChange={(e) => setDeliveryMode(e.target.value as "LIVE_ONLINE" | "OFFLINE_WORKSHOP" | "PRE_RECORDED" | "HYBRID")}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  >
                     <option value="PRE_RECORDED">Pre-Recorded</option>
                     <option value="LIVE_ONLINE">Live Online</option>
                     <option value="HYBRID">Hybrid</option>
+                    <option value="OFFLINE_WORKSHOP">Offline Workshop</option>
                   </select>
                 </div>
               </div>

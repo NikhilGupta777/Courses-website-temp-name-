@@ -94,7 +94,14 @@ export const lessonRouter = router({
         const canPreviewFreeLesson = lesson.isFree && lesson.isPublished && lesson.module.course.status === "PUBLISHED";
         if (!canPreviewFreeLesson) throw new TRPCError({ code: "FORBIDDEN", message: "You do not have access to this lesson" });
       }
-      return lesson;
+
+      // Include the user's saved video position so the player can resume
+      const myProgress = await ctx.db.lessonProgress.findUnique({
+        where: { userId_lessonId: { userId: ctx.session.user.id, lessonId: input.lessonId } },
+        select: { lastPosition: true, isCompleted: true },
+      });
+
+      return { ...lesson, lastPosition: myProgress?.lastPosition ?? 0, isCompleted: myProgress?.isCompleted ?? false };
     }),
 
   // BUG #6 FIX: save the Mux uploadId as videoUrl immediately after upload starts,

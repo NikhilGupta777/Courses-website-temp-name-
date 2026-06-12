@@ -65,7 +65,7 @@ export default function DashboardPage() {
     { label: "Courses Enrolled", value: stats?.totalEnrolled ?? 0, icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253", color: "bg-violet-50 text-violet-600" },
     { label: "Completed", value: enrollments.filter(e => e.status === "COMPLETED").length, icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z", color: "bg-green-50 text-green-600" },
     { label: "Certificates", value: stats?.totalCertificates ?? 0, icon: "M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z", color: "bg-yellow-50 text-yellow-600" },
-    { label: "Day Streak", value: 7, icon: "M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z", color: "bg-orange-50 text-orange-600" },
+    { label: "Day Streak", value: stats?.dayStreak ?? 0, icon: "M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z", color: "bg-orange-50 text-orange-600" },
   ];
 
   return (
