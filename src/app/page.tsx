@@ -1,19 +1,18 @@
 // ────────────────────────────────────────────────────────────────────────────
-// LearnAI — Flagship homepage
+// LearnAI — Flagship homepage (v2: world-class)
 // ────────────────────────────────────────────────────────────────────────────
-// 16-section landing page with animated SVG visuals, real DB data (courses +
-// live classes via tRPC), and a stack of interactive client components for
-// the AI Tutor demo, charts, marquees, learning path, etc.
-//
-// This file is a SERVER component. Each interactive piece is its own client
-// component under `src/components/home/`.
+// 18-section narrative with custom SVG visualisations, real DB data, an
+// interactive prompt playground, an India map heatmap, a scroll-pinned
+// Before/After story, magnetic buttons, spotlight bento tiles, real video,
+// and a custom cursor — pretty much every "feel premium" technique stacked.
 // ────────────────────────────────────────────────────────────────────────────
 
 import Link from "next/link";
-import { CATEGORIES, CATEGORY_COLORS } from "@/lib/data/courses";
+import { CATEGORIES } from "@/lib/data/courses";
 import { OrganisationJsonLd, WebSiteJsonLd } from "@/components/seo/json-ld";
 import { trpcClient } from "@/lib/trpc/client";
 
+// Existing components
 import { MeshGradient } from "@/components/home/MeshGradient";
 import { NeuralNetworkBg } from "@/components/home/NeuralNetworkBg";
 import { AnimatedCounter } from "@/components/home/AnimatedCounter";
@@ -24,17 +23,23 @@ import { AiTutorDemo } from "@/components/home/AiTutorDemo";
 import { MarqueeLogos } from "@/components/home/MarqueeLogos";
 import { OutcomesChart } from "@/components/home/OutcomesChart";
 import { LearningPathDiagram } from "@/components/home/LearningPathDiagram";
-import { TiltCourseCard, CourseCardVisual } from "@/components/home/TiltCourseCard";
+import { TiltCourseCard } from "@/components/home/TiltCourseCard";
 import { CountdownTimer } from "@/components/home/CountdownTimer";
 import { TestimonialCarousel } from "@/components/home/TestimonialCarousel";
 import { FaqAccordion } from "@/components/home/FaqAccordion";
 import { CertificateShowcase } from "@/components/home/CertificateShowcase";
 import { BentoFeaturesGrid } from "@/components/home/BentoFeaturesGrid";
 
-// ────────────────────────────────────────────────────────────────────────────
-// Data loading — uses the same trpcClient that other server components use.
-// Errors are swallowed so the homepage always renders even if the DB is down.
-// ────────────────────────────────────────────────────────────────────────────
+// ── New v2 components ────────────────────────────────────────────────────
+import { IndiaMapHeatmap }       from "@/components/home/IndiaMapHeatmap";
+import { InteractivePlayground } from "@/components/home/InteractivePlayground";
+import { MagneticButton }        from "@/components/home/MagneticButton";
+import { CustomCursor }          from "@/components/home/CustomCursor";
+import { ParallaxHeroLayers }    from "@/components/home/ParallaxHeroLayers";
+import { BeforeAfterStory }      from "@/components/home/BeforeAfterStory";
+import { HeroVideoReel }         from "@/components/home/HeroVideoReel";
+import { illustrationFor }       from "@/components/home/CourseIllustrations";
+
 async function loadHomeData() {
   try {
     const [featuredCourses, upcomingLive] = await Promise.all([
@@ -55,18 +60,28 @@ export default async function HomePage() {
   const liveSessions = upcomingLive.slice(0, 3);
 
   return (
-    <div className="overflow-hidden bg-white">
+    <div className="overflow-x-hidden bg-white">
       <OrganisationJsonLd />
       <WebSiteJsonLd />
 
-      {/* ════════════════════════════════════════════════════════════════════
-          1. HERO — animated mesh gradient + neural network + glassmorphism
-          ════════════════════════════════════════════════════════════════════ */}
-      <section className="relative min-h-screen flex items-center pt-24 lg:pt-20">
-        <MeshGradient />
-        <NeuralNetworkBg />
+      {/* Custom dot+ring cursor (auto-disabled on touch / reduced-motion) */}
+      <CustomCursor />
 
-        {/* Subtle grain overlay for depth */}
+      {/* ════════════════════════════════════════════════════════════════════
+          1. HERO — multi-layer parallax with mouse-tracked depth
+          ════════════════════════════════════════════════════════════════════ */}
+      <section className="relative min-h-screen flex items-center pt-24 lg:pt-20 overflow-hidden">
+        <ParallaxHeroLayers
+          className="absolute inset-0"
+          back={
+            <>
+              <MeshGradient />
+              <NeuralNetworkBg />
+            </>
+          }
+        />
+
+        {/* Grain overlay (top of parallax stack) */}
         <div
           className="absolute inset-0 opacity-[0.03] mix-blend-overlay pointer-events-none"
           style={{
@@ -77,9 +92,8 @@ export default async function HomePage() {
 
         <div className="relative mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8 py-16 lg:py-20">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            {/* ── Left: heading + CTAs ──────────────────────────────────── */}
+            {/* ── Left: text + CTAs ────────────────────────────────────── */}
             <div className="lg:col-span-7 relative">
-              {/* New release badge */}
               <RevealOnScroll>
                 <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/80 backdrop-blur-sm border border-violet-200 text-violet-700 rounded-full text-xs font-semibold mb-6 shadow-sm">
                   <span className="relative flex w-2 h-2">
@@ -111,14 +125,13 @@ export default async function HomePage() {
                 </p>
               </RevealOnScroll>
 
-              {/* CTAs */}
               <RevealOnScroll delay={360}>
                 <div className="mt-8 flex flex-col sm:flex-row gap-3">
-                  <Link
+                  <MagneticButton
                     href="/courses"
-                    className="group relative inline-flex items-center justify-center px-7 py-4 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold rounded-2xl shadow-xl shadow-violet-500/30 hover:shadow-2xl hover:shadow-violet-500/40 hover:scale-[1.03] transition-all overflow-hidden"
+                    className="group relative inline-flex items-center justify-center px-7 py-4 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold rounded-2xl shadow-xl shadow-violet-500/30 hover:shadow-2xl hover:shadow-violet-500/40 overflow-hidden"
+                    strength={10}
                   >
-                    {/* Shimmer */}
                     <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent group-hover:translate-x-full transition-transform duration-1000" />
                     <span className="relative flex items-center gap-2">
                       Start learning AI free
@@ -126,20 +139,20 @@ export default async function HomePage() {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
                       </svg>
                     </span>
-                  </Link>
-                  <Link
-                    href="#tutor-demo"
-                    className="inline-flex items-center justify-center gap-2 px-7 py-4 bg-white border-2 border-gray-200 text-gray-800 font-bold rounded-2xl hover:border-violet-300 hover:bg-violet-50 transition-all"
+                  </MagneticButton>
+                  <MagneticButton
+                    href="#playground"
+                    className="inline-flex items-center justify-center gap-2 px-7 py-4 bg-white border-2 border-gray-200 text-gray-800 font-bold rounded-2xl hover:border-violet-300 hover:bg-violet-50 transition-colors"
+                    strength={6}
                   >
                     <svg className="w-4 h-4 text-violet-600" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M8 5v14l11-7z" />
                     </svg>
-                    Watch the demo (90s)
-                  </Link>
+                    Try the AI playground
+                  </MagneticButton>
                 </div>
               </RevealOnScroll>
 
-              {/* Stats strip */}
               <RevealOnScroll delay={500}>
                 <div className="mt-10 grid grid-cols-3 gap-4 max-w-md">
                   {[
@@ -158,11 +171,10 @@ export default async function HomePage() {
               </RevealOnScroll>
             </div>
 
-            {/* ── Right: floating glassmorphism showcase ───────────────── */}
+            {/* ── Right: floating glass showcase (front parallax layer) ─── */}
             <div className="lg:col-span-5 relative">
               <RevealOnScroll from="scale" delay={300}>
                 <div className="relative">
-                  {/* Big main panel — fake AI chat */}
                   <div className="glass rounded-3xl p-5 shadow-2xl shadow-violet-500/20 animate-float-sway" style={{ animationDelay: "-2s" }}>
                     <div className="flex items-center gap-2 mb-4">
                       <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center">
@@ -193,7 +205,6 @@ export default async function HomePage() {
                     </div>
                   </div>
 
-                  {/* Floating progress card (top-right) */}
                   <div
                     className="absolute -top-6 -right-6 lg:-right-8 glass rounded-2xl p-3.5 shadow-xl w-[200px] animate-float-sway"
                     style={{ animationDelay: "-3s" }}
@@ -209,7 +220,6 @@ export default async function HomePage() {
                     </div>
                   </div>
 
-                  {/* Floating badge (bottom-left) */}
                   <div
                     className="absolute -bottom-6 -left-4 lg:-left-8 glass rounded-2xl p-3 shadow-xl flex items-center gap-2.5 animate-float-sway"
                     style={{ animationDelay: "-5s" }}
@@ -229,7 +239,6 @@ export default async function HomePage() {
             </div>
           </div>
 
-          {/* Hero scroll cue */}
           <div className="mt-16 lg:mt-20 flex justify-center">
             <div className="flex flex-col items-center gap-2 text-gray-400">
               <span className="text-[10px] uppercase tracking-widest">Scroll to explore</span>
@@ -242,7 +251,29 @@ export default async function HomePage() {
       </section>
 
       {/* ════════════════════════════════════════════════════════════════════
-          2. LIVE PULSE DASHBOARD — animated charts
+          2. VIDEO REEL — 60-second tour
+          ════════════════════════════════════════════════════════════════════ */}
+      <section className="relative py-16 lg:py-24 bg-gradient-to-b from-white via-violet-50/30 to-white">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <RevealOnScroll>
+            <div className="text-center mb-10">
+              <span className="text-xs font-bold tracking-widest uppercase text-violet-600">See it in action</span>
+              <h2 className="text-3xl lg:text-5xl font-bold text-gray-900 mt-2">
+                90 seconds of LearnAI
+              </h2>
+              <p className="mt-3 text-gray-600 max-w-2xl mx-auto">
+                A quick tour: live classes, the AI Tutor, hands-on quizzes, and how alumni are landing AI jobs.
+              </p>
+            </div>
+          </RevealOnScroll>
+          <RevealOnScroll delay={150}>
+            <HeroVideoReel />
+          </RevealOnScroll>
+        </div>
+      </section>
+
+      {/* ════════════════════════════════════════════════════════════════════
+          3. LIVE PULSE — animated charts
           ════════════════════════════════════════════════════════════════════ */}
       <section className="py-16 lg:py-20 bg-gradient-to-b from-white via-violet-50/30 to-white border-y border-violet-100">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -257,12 +288,10 @@ export default async function HomePage() {
               </p>
             </div>
           </RevealOnScroll>
-
           <RevealOnScroll delay={150}>
             <LivePulseDashboard />
           </RevealOnScroll>
 
-          {/* Activity feed */}
           <RevealOnScroll delay={250}>
             <div className="mt-12 bg-gradient-to-br from-violet-50 to-indigo-50 rounded-3xl p-6 lg:p-8 border border-violet-100">
               <div className="flex items-center justify-between mb-5">
@@ -282,11 +311,32 @@ export default async function HomePage() {
       </section>
 
       {/* ════════════════════════════════════════════════════════════════════
-          3. AI TUTOR DEMO — typing chat showcase
+          4. INDIA MAP HEATMAP
           ════════════════════════════════════════════════════════════════════ */}
-      <section id="tutor-demo" className="relative py-20 lg:py-28 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-50 to-violet-50/40" />
-        {/* Animated grid lines background */}
+      <section className="py-16 lg:py-20 bg-white">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <RevealOnScroll>
+            <div className="text-center mb-10">
+              <span className="text-xs font-bold tracking-widest uppercase text-violet-600">From Kerala to Kashmir</span>
+              <h2 className="text-3xl lg:text-5xl font-bold text-gray-900 mt-2">
+                India&rsquo;s biggest AI-learning community
+              </h2>
+              <p className="mt-3 text-gray-600 max-w-2xl mx-auto">
+                Hover any city to see how many people are studying AI there right now.
+              </p>
+            </div>
+          </RevealOnScroll>
+          <RevealOnScroll delay={150}>
+            <IndiaMapHeatmap />
+          </RevealOnScroll>
+        </div>
+      </section>
+
+      {/* ════════════════════════════════════════════════════════════════════
+          5. INTERACTIVE PROMPT PLAYGROUND
+          ════════════════════════════════════════════════════════════════════ */}
+      <section id="playground" className="relative py-20 lg:py-28 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-violet-50/40 to-gray-50" />
         <div
           className="absolute inset-0 opacity-30"
           style={{
@@ -298,6 +348,56 @@ export default async function HomePage() {
         />
 
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-12 items-center">
+            <RevealOnScroll from="left" className="lg:col-span-2">
+              <div>
+                <span className="text-xs font-bold tracking-widest uppercase text-violet-600">Try it live</span>
+                <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mt-2 leading-tight">
+                  Don&rsquo;t take<br />our word for it.<br />
+                  <span className="bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">
+                    Try the AI yourself.
+                  </span>
+                </h2>
+                <p className="mt-5 text-lg text-gray-600 leading-relaxed">
+                  Pick a sample prompt — or write your own — and watch the response stream in. This is the same kind of GPT-4o output you&rsquo;ll be working with on day one of any course.
+                </p>
+
+                <ul className="mt-6 space-y-2.5 text-sm text-gray-700">
+                  {[
+                    "Real GPT-4o responses, hand-curated",
+                    "Streaming — char-by-char, just like the real API",
+                    "No login, no card, no waiting list",
+                  ].map((b) => (
+                    <li key={b} className="flex items-start gap-2">
+                      <svg className="flex-shrink-0 w-5 h-5 text-emerald-500 mt-0.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>{b}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="mt-8 hidden lg:flex items-center gap-3 text-xs text-gray-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                  Try a chip prompt to start
+                </div>
+              </div>
+            </RevealOnScroll>
+
+            <RevealOnScroll from="right" delay={150} className="lg:col-span-3">
+              <InteractivePlayground />
+            </RevealOnScroll>
+          </div>
+        </div>
+      </section>
+
+      {/* ════════════════════════════════════════════════════════════════════
+          6. AI TUTOR DEMO — typing chat
+          ════════════════════════════════════════════════════════════════════ */}
+      <section className="relative py-20 lg:py-24 bg-white">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <RevealOnScroll from="left">
               <div>
@@ -311,16 +411,14 @@ export default async function HomePage() {
                 <p className="mt-5 text-lg text-gray-600 leading-relaxed">
                   Available 24/7 on every dashboard page. Trained on the LearnAI curriculum. Speaks Hindi, English, and Hinglish.
                 </p>
-
-                <ul className="mt-6 space-y-3">
+                <ul className="mt-6 space-y-3 text-sm text-gray-700">
                   {[
                     "Explain any concept at any depth — beginner to PhD",
                     "Get hands-on code examples in Python, JS, or pseudocode",
                     "Ask for hints on quizzes — without giving away the answer",
                     "Practise prompt engineering with instant feedback",
-                    "Available in the floating widget on every dashboard page",
                   ].map((b) => (
-                    <li key={b} className="flex items-start gap-2 text-sm text-gray-700">
+                    <li key={b} className="flex items-start gap-2">
                       <svg className="flex-shrink-0 w-5 h-5 text-emerald-500 mt-0.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
@@ -328,22 +426,21 @@ export default async function HomePage() {
                     </li>
                   ))}
                 </ul>
-
                 <div className="mt-8 flex flex-wrap items-center gap-3">
-                  <Link
+                  <MagneticButton
                     href="/pricing"
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg shadow-violet-500/25 hover:shadow-xl transition-all"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg shadow-violet-500/25"
+                    strength={6}
                   >
                     Try the AI Tutor
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                     </svg>
-                  </Link>
+                  </MagneticButton>
                   <span className="text-xs text-gray-500">7-day free trial · No credit card</span>
                 </div>
               </div>
             </RevealOnScroll>
-
             <RevealOnScroll from="right" delay={150}>
               <AiTutorDemo />
             </RevealOnScroll>
@@ -352,7 +449,12 @@ export default async function HomePage() {
       </section>
 
       {/* ════════════════════════════════════════════════════════════════════
-          4. TOOLS MARQUEE
+          7. BEFORE / AFTER STORY — scroll-pinned 3-act narrative
+          ════════════════════════════════════════════════════════════════════ */}
+      <BeforeAfterStory />
+
+      {/* ════════════════════════════════════════════════════════════════════
+          8. TOOLS MARQUEE
           ════════════════════════════════════════════════════════════════════ */}
       <section className="py-14 bg-white border-y border-gray-100">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -371,7 +473,7 @@ export default async function HomePage() {
       </section>
 
       {/* ════════════════════════════════════════════════════════════════════
-          5. BENTO FEATURES GRID
+          9. BENTO FEATURES
           ════════════════════════════════════════════════════════════════════ */}
       <section className="py-20 lg:py-24 bg-gradient-to-b from-white to-gray-50">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -380,7 +482,7 @@ export default async function HomePage() {
               <span className="text-xs font-bold tracking-widest uppercase text-violet-600">Why LearnAI</span>
               <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mt-2">
                 Everything you need.<br />
-                <span className="text-gray-400">Nothing you don&apos;t.</span>
+                <span className="text-gray-400">Nothing you don&rsquo;t.</span>
               </h2>
             </div>
           </RevealOnScroll>
@@ -391,7 +493,7 @@ export default async function HomePage() {
       </section>
 
       {/* ════════════════════════════════════════════════════════════════════
-          6. CAREER OUTCOMES — animated salary chart
+          10. CAREER OUTCOMES
           ════════════════════════════════════════════════════════════════════ */}
       <section className="py-20 lg:py-24 bg-white">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
@@ -401,9 +503,6 @@ export default async function HomePage() {
               <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mt-2">
                 Real careers. <span className="text-emerald-600">Real numbers.</span>
               </h2>
-              <p className="mt-3 text-lg text-gray-600 max-w-2xl mx-auto">
-                We track what happens after you finish a course. The data speaks for itself.
-              </p>
             </div>
           </RevealOnScroll>
           <RevealOnScroll delay={150}>
@@ -413,7 +512,7 @@ export default async function HomePage() {
       </section>
 
       {/* ════════════════════════════════════════════════════════════════════
-          7. LEARNING PATH DIAGRAM
+          11. LEARNING PATH
           ════════════════════════════════════════════════════════════════════ */}
       <section className="py-20 lg:py-24 bg-gradient-to-br from-violet-50/40 via-white to-indigo-50/40">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -423,9 +522,6 @@ export default async function HomePage() {
               <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mt-2">
                 A clear path from curious to hired
               </h2>
-              <p className="mt-3 text-lg text-gray-600 max-w-2xl mx-auto">
-                Hover any milestone to see exactly what you&apos;ll learn — and the outcome it unlocks.
-              </p>
             </div>
           </RevealOnScroll>
           <RevealOnScroll delay={150}>
@@ -435,7 +531,7 @@ export default async function HomePage() {
       </section>
 
       {/* ════════════════════════════════════════════════════════════════════
-          8. FREE COURSES
+          12. FREE COURSES
           ════════════════════════════════════════════════════════════════════ */}
       <section className="py-20 lg:py-24 bg-gradient-to-br from-emerald-50/40 to-teal-50/40 border-y border-emerald-100">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -450,15 +546,15 @@ export default async function HomePage() {
                   <span className="text-emerald-600">No card required.</span>
                 </h2>
               </div>
-              <Link
+              <MagneticButton
                 href="/register"
-                className="flex-shrink-0 inline-flex items-center gap-2 px-6 py-3.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 shadow-xl shadow-emerald-500/25 transition-all hover:scale-105"
+                className="flex-shrink-0 inline-flex items-center gap-2 px-6 py-3.5 bg-emerald-600 text-white font-bold rounded-xl shadow-xl shadow-emerald-500/25"
               >
                 Sign up free
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
-              </Link>
+              </MagneticButton>
             </div>
           </RevealOnScroll>
 
@@ -476,7 +572,7 @@ export default async function HomePage() {
                     isFree
                     level={course.level}
                     category={course.category?.name}
-                    visual={<CourseCardVisual catSlug={course.category?.slug} title={course.title} />}
+                    visual={illustrationFor(course.category?.slug)}
                   />
                 </RevealOnScroll>
               ))}
@@ -488,7 +584,7 @@ export default async function HomePage() {
       </section>
 
       {/* ════════════════════════════════════════════════════════════════════
-          9. FEATURED PAID COURSES — tilted 3D cards
+          13. FEATURED PAID COURSES
           ════════════════════════════════════════════════════════════════════ */}
       <section className="py-20 lg:py-24 bg-white">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -502,14 +598,13 @@ export default async function HomePage() {
             </div>
           </RevealOnScroll>
 
-          {/* Category pills */}
           <RevealOnScroll delay={100}>
             <div className="flex flex-wrap justify-center gap-2 mb-10">
               {CATEGORIES.slice(0, 8).map((cat) => (
                 <Link
                   key={cat.id}
                   href={`/courses?category=${cat.id}`}
-                  className="px-4 py-2 rounded-full text-xs font-semibold bg-white border border-gray-200 text-gray-600 hover:bg-violet-600 hover:text-white hover:border-violet-600 transition-all"
+                  className="px-4 py-2 rounded-full text-xs font-semibold bg-white border border-gray-200 text-gray-600 hover:bg-violet-600 hover:text-white hover:border-violet-600 transition-colors"
                 >
                   {cat.label}
                 </Link>
@@ -519,32 +614,24 @@ export default async function HomePage() {
 
           {paidFeatured.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {paidFeatured.map((course, i) => {
-                const cat = course.category?.slug ?? "prompting";
-                const colours = CATEGORY_COLORS[cat] ?? CATEGORY_COLORS.prompting!;
-                return (
-                  <RevealOnScroll key={course.id} delay={i * 80} from="bottom">
-                    <TiltCourseCard
-                      href={`/courses/${course.slug}`}
-                      title={course.title}
-                      subtitle={course.subtitle}
-                      instructor={course.instructor.displayName}
-                      rating={course.averageRating}
-                      students={course.totalStudents}
-                      price={course.price}
-                      originalPrice={course.originalPrice}
-                      isFree={course.isFree}
-                      level={course.level}
-                      category={course.category?.name}
-                      visual={
-                        <div className={`absolute inset-0 bg-gradient-to-br ${colours.from} ${colours.to}`}>
-                          <CourseCardVisual catSlug={cat} title={course.title} />
-                        </div>
-                      }
-                    />
-                  </RevealOnScroll>
-                );
-              })}
+              {paidFeatured.map((course, i) => (
+                <RevealOnScroll key={course.id} delay={i * 80}>
+                  <TiltCourseCard
+                    href={`/courses/${course.slug}`}
+                    title={course.title}
+                    subtitle={course.subtitle}
+                    instructor={course.instructor.displayName}
+                    rating={course.averageRating}
+                    students={course.totalStudents}
+                    price={course.price}
+                    originalPrice={course.originalPrice}
+                    isFree={course.isFree}
+                    level={course.level}
+                    category={course.category?.name}
+                    visual={illustrationFor(course.category?.slug)}
+                  />
+                </RevealOnScroll>
+              ))}
             </div>
           ) : (
             <EmptyCourseGrid />
@@ -565,25 +652,15 @@ export default async function HomePage() {
       </section>
 
       {/* ════════════════════════════════════════════════════════════════════
-          10. LIVE CLASSES — with real countdown timers
+          14. LIVE CLASSES — countdown timers
           ════════════════════════════════════════════════════════════════════ */}
       <section className="relative py-20 lg:py-24 overflow-hidden bg-gradient-to-br from-violet-900 via-purple-900 to-indigo-900">
-        {/* Decorative orbs */}
         <div className="absolute top-10 left-10 w-72 h-72 rounded-full bg-violet-500/30 blur-3xl animate-pulse-strong" />
         <div className="absolute bottom-10 right-10 w-96 h-96 rounded-full bg-pink-500/20 blur-3xl animate-pulse-strong" style={{ animationDelay: "-3s" }} />
 
-        {/* Animated SVG waves at bottom */}
         <svg className="absolute bottom-0 left-0 right-0 w-full h-24 opacity-30" preserveAspectRatio="none" viewBox="0 0 1440 100">
-          <path
-            d="M0,50 C320,100 720,0 1440,60 L1440,100 L0,100 Z"
-            fill="white"
-            opacity="0.05"
-          />
-          <path
-            d="M0,70 C480,30 960,90 1440,40 L1440,100 L0,100 Z"
-            fill="white"
-            opacity="0.08"
-          />
+          <path d="M0,50 C320,100 720,0 1440,60 L1440,100 L0,100 Z" fill="white" opacity="0.05" />
+          <path d="M0,70 C480,30 960,90 1440,40 L1440,100 L0,100 Z" fill="white" opacity="0.08" />
         </svg>
 
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -597,9 +674,6 @@ export default async function HomePage() {
                 Live with India&apos;s top<br />
                 <span className="bg-gradient-to-r from-pink-300 to-violet-300 bg-clip-text text-transparent">AI engineers</span>
               </h2>
-              <p className="mt-4 text-lg text-violet-200 max-w-2xl mx-auto">
-                Real-time Q&amp;A. Code-along sessions. Career conversations. Free with Pro.
-              </p>
             </div>
           </RevealOnScroll>
 
@@ -607,7 +681,7 @@ export default async function HomePage() {
             {liveSessions.length === 0 ? (
               <div className="col-span-3 glass-dark rounded-3xl p-12 text-center">
                 <p className="text-violet-200 text-sm">No upcoming sessions right now. Check back soon — we host 3+ live classes a week.</p>
-                <Link href="/live" className="inline-block mt-4 px-5 py-2 bg-white/20 hover:bg-white/30 text-white text-sm font-semibold rounded-xl transition-colors">
+                <Link href="/live" className="inline-block mt-4 px-5 py-2 bg-white/20 hover:bg-white/30 text-white text-sm font-semibold rounded-xl">
                   View all live sessions
                 </Link>
               </div>
@@ -618,7 +692,7 @@ export default async function HomePage() {
                 const seatsPercent = Math.round((cls._count.rsvps / cls.maxSeats) * 100);
                 return (
                   <RevealOnScroll key={cls.id} delay={i * 100}>
-                    <div className="glass-dark rounded-3xl p-6 hover:bg-white/15 transition-all">
+                    <div className="glass-dark rounded-3xl p-6 hover:bg-white/15 transition-colors">
                       {isLive ? (
                         <div className="inline-flex items-center gap-1.5 bg-red-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full mb-4 animate-pulse-strong">
                           <span className="w-1 h-1 bg-white rounded-full" />
@@ -629,10 +703,8 @@ export default async function HomePage() {
                           Upcoming
                         </div>
                       )}
-
                       <h3 className="font-bold text-white text-base leading-tight mb-2 line-clamp-2">{cls.title}</h3>
                       {cls.topic && <p className="text-xs text-violet-300 mb-4">{cls.topic}</p>}
-
                       <div className="space-y-2 text-xs text-violet-200 mb-4">
                         <div className="flex items-center gap-2">
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -647,32 +719,22 @@ export default async function HomePage() {
                           {new Date(cls.scheduledAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} · {new Date(cls.scheduledAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} IST
                         </div>
                       </div>
-
-                      {/* Real countdown timer */}
                       <div className="mb-4">
                         <CountdownTimer target={cls.scheduledAt as unknown as string} />
                       </div>
-
-                      {/* Seat availability */}
                       <div className="mb-3">
                         <div className="flex items-center justify-between text-[10px] text-violet-300 mb-1">
                           <span>{seatsLeft} of {cls.maxSeats} seats left</span>
                           <span>{seatsPercent}% full</span>
                         </div>
                         <div className="w-full bg-white/10 rounded-full h-1.5">
-                          <div
-                            className="bg-gradient-to-r from-violet-400 to-pink-400 h-1.5 rounded-full"
-                            style={{ width: `${seatsPercent}%` }}
-                          />
+                          <div className="bg-gradient-to-r from-violet-400 to-pink-400 h-1.5 rounded-full" style={{ width: `${seatsPercent}%` }} />
                         </div>
                       </div>
-
                       <Link
                         href="/live"
-                        className={`block text-center py-2.5 rounded-xl text-sm font-bold transition-all ${
-                          isLive
-                            ? "bg-red-500 hover:bg-red-400 text-white"
-                            : "bg-white text-violet-700 hover:bg-violet-50"
+                        className={`block text-center py-2.5 rounded-xl text-sm font-bold transition-colors ${
+                          isLive ? "bg-red-500 hover:bg-red-400 text-white" : "bg-white text-violet-700 hover:bg-violet-50"
                         }`}
                       >
                         {isLive ? "Join Live Now →" : "Reserve Free Seat"}
@@ -685,21 +747,21 @@ export default async function HomePage() {
           </div>
 
           <div className="text-center">
-            <Link
+            <MagneticButton
               href="/live"
-              className="inline-flex items-center gap-2 px-7 py-3.5 bg-white text-violet-700 font-bold rounded-xl hover:bg-violet-50 shadow-2xl transition-all hover:scale-105"
+              className="inline-flex items-center gap-2 px-7 py-3.5 bg-white text-violet-700 font-bold rounded-xl hover:bg-violet-50 shadow-2xl"
             >
               View all live classes
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
-            </Link>
+            </MagneticButton>
           </div>
         </div>
       </section>
 
       {/* ════════════════════════════════════════════════════════════════════
-          11. CERTIFICATE SHOWCASE — 3D floating certificates
+          15. CERTIFICATE SHOWCASE
           ════════════════════════════════════════════════════════════════════ */}
       <section className="py-20 lg:py-28 bg-gradient-to-br from-amber-50/30 via-white to-emerald-50/30 overflow-hidden">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -714,7 +776,6 @@ export default async function HomePage() {
                 <p className="mt-5 text-lg text-gray-600 leading-relaxed">
                   Every certificate has a public verification URL — your future employer can confirm it in two clicks. Listed under &ldquo;AI Skills&rdquo; in 200+ Indian company HRMS systems.
                 </p>
-
                 <div className="mt-6 grid grid-cols-3 gap-4">
                   <div>
                     <div className="text-3xl font-bold text-amber-600"><AnimatedCounter to={5000} indian />+</div>
@@ -729,22 +790,19 @@ export default async function HomePage() {
                     <div className="text-xs text-gray-500 mt-1">Course completion</div>
                   </div>
                 </div>
-
                 <div className="mt-8 flex flex-wrap items-center gap-3">
-                  <Link
+                  <MagneticButton
                     href="/verify"
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-amber-600 text-white font-semibold rounded-xl hover:bg-amber-700 shadow-lg shadow-amber-500/25 transition-all"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-amber-600 text-white font-semibold rounded-xl shadow-lg shadow-amber-500/25 hover:bg-amber-700 transition-colors"
                   >
                     Verify a certificate
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                  </Link>
-                  <span className="text-xs text-gray-500">PDF download · LinkedIn-ready · Public URLs</span>
+                  </MagneticButton>
                 </div>
               </div>
             </RevealOnScroll>
-
             <RevealOnScroll from="right" delay={150}>
               <CertificateShowcase />
             </RevealOnScroll>
@@ -753,7 +811,7 @@ export default async function HomePage() {
       </section>
 
       {/* ════════════════════════════════════════════════════════════════════
-          12. TESTIMONIALS — auto-rotating carousel
+          16. TESTIMONIALS
           ════════════════════════════════════════════════════════════════════ */}
       <section className="py-20 lg:py-24 bg-gradient-to-b from-white to-violet-50/30">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -773,7 +831,7 @@ export default async function HomePage() {
       </section>
 
       {/* ════════════════════════════════════════════════════════════════════
-          13. PARTNERS / TRUST MARQUEE
+          17. PARTNERS MARQUEE + FAQ
           ════════════════════════════════════════════════════════════════════ */}
       <section className="py-14 bg-white border-y border-gray-100">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -782,16 +840,12 @@ export default async function HomePage() {
               <span className="text-xs font-bold tracking-widest uppercase text-gray-500">
                 Our alumni now work at
               </span>
-              <p className="text-sm text-gray-400 mt-1">From IIM Bangalore to Razorpay engineering teams</p>
             </div>
           </RevealOnScroll>
           <MarqueeLogos kind="partners" />
         </div>
       </section>
 
-      {/* ════════════════════════════════════════════════════════════════════
-          14. FAQ — interactive accordion
-          ════════════════════════════════════════════════════════════════════ */}
       <section className="py-20 lg:py-24 bg-gradient-to-b from-violet-50/30 to-white">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <RevealOnScroll>
@@ -805,7 +859,6 @@ export default async function HomePage() {
           <RevealOnScroll delay={150}>
             <FaqAccordion />
           </RevealOnScroll>
-
           <div className="mt-12 text-center">
             <p className="text-sm text-gray-500">
               Still have a question?{" "}
@@ -818,12 +871,10 @@ export default async function HomePage() {
       </section>
 
       {/* ════════════════════════════════════════════════════════════════════
-          15. FINAL CTA — gradient banner with sparkles
+          18. FINAL CTA
           ════════════════════════════════════════════════════════════════════ */}
       <section className="relative py-20 lg:py-28 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700" />
-
-        {/* Decorative grid + orbs */}
         <div
           className="absolute inset-0 opacity-20"
           style={{
@@ -836,7 +887,6 @@ export default async function HomePage() {
         <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-pink-400/30 blur-3xl animate-blob-1" />
         <div className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full bg-violet-400/30 blur-3xl animate-blob-2" />
 
-        {/* Floating sparkles */}
         {[
           { x: "10%", y: "20%", d: "0s",  s: "8px" },
           { x: "85%", y: "30%", d: "0.6s", s: "10px" },
@@ -870,21 +920,23 @@ export default async function HomePage() {
           </RevealOnScroll>
           <RevealOnScroll delay={300}>
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3">
-              <Link
+              <MagneticButton
                 href="/register"
-                className="group inline-flex items-center justify-center gap-2 px-8 py-4 bg-white text-violet-700 font-bold rounded-2xl shadow-2xl hover:scale-105 hover:shadow-white/40 transition-all"
+                className="group inline-flex items-center justify-center gap-2 px-8 py-4 bg-white text-violet-700 font-bold rounded-2xl shadow-2xl"
+                strength={14}
               >
                 Start free — no card needed
                 <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
                 </svg>
-              </Link>
-              <Link
+              </MagneticButton>
+              <MagneticButton
                 href="/pricing"
-                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white/10 backdrop-blur-sm text-white font-bold rounded-2xl border-2 border-white/30 hover:bg-white/20 transition-all"
+                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white/10 backdrop-blur-sm text-white font-bold rounded-2xl border-2 border-white/30 hover:bg-white/20 transition-colors"
+                strength={6}
               >
                 See pricing
-              </Link>
+              </MagneticButton>
             </div>
           </RevealOnScroll>
           <RevealOnScroll delay={450}>
@@ -910,7 +962,6 @@ export default async function HomePage() {
   );
 }
 
-// ─── Empty state for course grids when DB is unreachable ──────────────────
 function EmptyCourseGrid() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
