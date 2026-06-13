@@ -1,6 +1,13 @@
 // GET /api/cron/live-reminders
-// Vercel Cron job — runs every 15 min to send reminder emails to RSVP'd users.
-// Two reminders per session: 24h before (T-24h) and 30 min before (T-30m).
+// Daily cron — sends "your live class is coming up" reminder emails to RSVP'd
+// users for any session happening in the next ~28 hours.
+//
+// Why daily (not every 15 min): Vercel's Hobby plan only allows one cron run
+// per day. A single daily run still reliably reaches every learner the day
+// before their session. Teams on Vercel Pro (or an external scheduler such as
+// cron-job.org / GitHub Actions) can call this endpoint more frequently — the
+// dedup logic below makes repeated calls safe, and passing `?window=30m` lets
+// a finer-grained scheduler also send 30-minute reminders.
 //
 // Triggered by Vercel Cron (vercel.json) or any scheduler that hits this URL
 // with the `Authorization: Bearer ${CRON_SECRET}` header.
@@ -9,15 +16,15 @@ import { type NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { sendLiveClassReminder } from "@/server/services/email";
 
-type ReminderKind = "24h" | "30m";
+type ReminderKind = "day" | "30m";
 
-// Two reminder windows. Each window is +/- 7 minutes wide so a 15-min cron
-// catches every session exactly twice. We use the LiveClass.metadata is not
-// available, so we rely on the absence of duplicate-notification tracking
-// in the DB. To stay idempotent, we record the reminder as a Notification
-// row with a deterministic dedup key (we re-use Notification.message field
-// to encode `[remind:24h:{id}]` and skip if it already exists).
-const WINDOW_MS = 7.5 * 60 * 1000; // 7.5 minutes either side of target
+// Look-ahead windows per reminder kind:
+//  • "day"  — catches sessions in the next 28 h (daily cron, day-before nudge)
+//  • "30m"  — catches sessions ~30 min out (needs a sub-hourly scheduler)
+const WINDOWS: Record<ReminderKind, { lookAheadMs: number; floorMs: number }> = {
+  day: { lookAheadMs: 28 * 60 * 60 * 1000, floorMs: 0 },
+  "30m": { lookAheadMs: 35 * 60 * 1000, floorMs: 20 * 60 * 1000 },
+};
 
 function dedupTag(kind: ReminderKind, liveClassId: string) {
   return `[remind:${kind}:${liveClassId}]`;
@@ -25,10 +32,9 @@ function dedupTag(kind: ReminderKind, liveClassId: string) {
 
 async function sendRemindersForKind(kind: ReminderKind) {
   const now = Date.now();
-  const offsetMs = kind === "24h" ? 24 * 60 * 60 * 1000 : 30 * 60 * 1000;
-  const targetTime = new Date(now + offsetMs);
-  const windowStart = new Date(targetTime.getTime() - WINDOW_MS);
-  const windowEnd   = new Date(targetTime.getTime() + WINDOW_MS);
+  const { lookAheadMs, floorMs } = WINDOWS[kind];
+  const windowStart = new Date(now + floorMs);
+  const windowEnd = new Date(now + lookAheadMs);
 
   const sessions = await db.liveClass.findMany({
     where: {
@@ -49,13 +55,13 @@ async function sendRemindersForKind(kind: ReminderKind) {
     const tag = dedupTag(kind, session.id);
     const dateStr = session.scheduledAt.toLocaleString("en-IN", {
       weekday: "short",
-      day:     "numeric",
-      month:   "long",
-      hour:    "2-digit",
-      minute:  "2-digit",
+      day: "numeric",
+      month: "long",
+      hour: "2-digit",
+      minute: "2-digit",
     });
-    const joinUrl = session.meetingUrl
-      ?? `${process.env.NEXT_PUBLIC_APP_URL ?? "https://learnai.in"}/live`;
+    const joinUrl =
+      session.meetingUrl ?? `${process.env.NEXT_PUBLIC_APP_URL ?? "https://learnai.in"}/live`;
 
     for (const rsvp of session.rsvps) {
       if (!rsvp.user.email) continue;
@@ -72,7 +78,13 @@ async function sendRemindersForKind(kind: ReminderKind) {
       if (existing) continue;
 
       try {
-        await sendLiveClassReminder(rsvp.user.email, rsvp.user.name ?? "Learner", session.title, dateStr, joinUrl);
+        await sendLiveClassReminder(
+          rsvp.user.email,
+          rsvp.user.name ?? "Learner",
+          session.title,
+          dateStr,
+          joinUrl,
+        );
         sent++;
       } catch (err) {
         console.error(`[cron] reminder send failed for ${rsvp.user.email}:`, err);
@@ -81,11 +93,11 @@ async function sendRemindersForKind(kind: ReminderKind) {
       // Record dedup notification
       await db.notification.create({
         data: {
-          userId:  rsvp.userId,
-          type:    "LIVE_SESSION_REMINDER",
-          title:   kind === "24h" ? "📅 Live class tomorrow" : "🔴 Live class starts in 30 minutes",
+          userId: rsvp.userId,
+          type: "LIVE_SESSION_REMINDER",
+          title: kind === "day" ? "📅 Your live class is coming up" : "🔴 Live class starts soon",
           message: `${tag} "${session.title}" — ${dateStr}`,
-          link:    "/live",
+          link: "/live",
         },
       });
     }
@@ -104,12 +116,14 @@ export async function GET(req: NextRequest) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
+  // Allow a finer-grained external scheduler to request the 30-minute window
+  // via ?window=30m. The default (Vercel daily cron) sends day-before nudges.
+  const windowParam = req.nextUrl.searchParams.get("window");
+  const kinds: ReminderKind[] = windowParam === "30m" ? ["30m"] : ["day"];
+
   try {
-    const [r24, r30] = await Promise.all([
-      sendRemindersForKind("24h"),
-      sendRemindersForKind("30m"),
-    ]);
-    return NextResponse.json({ ok: true, results: [r24, r30] });
+    const results = await Promise.all(kinds.map((k) => sendRemindersForKind(k)));
+    return NextResponse.json({ ok: true, results });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     console.error("[cron] live-reminders failed:", err);

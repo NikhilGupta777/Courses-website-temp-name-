@@ -51,22 +51,26 @@ export default function CareersPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Hero */}
-      <section className="pt-24 pb-16 bg-gradient-to-br from-violet-900 via-purple-900 to-indigo-900 text-center px-4 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10 pointer-events-none">
-          <div className="absolute top-0 left-1/4 w-80 h-80 bg-violet-400 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-indigo-400 rounded-full blur-3xl" />
+      <section className="pt-28 pb-16 bg-gradient-to-br from-violet-900 via-purple-900 to-indigo-900 text-center px-4 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-20 pointer-events-none">
+          <div className="absolute top-0 left-1/4 w-80 h-80 bg-violet-400 rounded-full blur-3xl animate-blob-1" />
+          <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-indigo-400 rounded-full blur-3xl animate-blob-2" />
         </div>
+        <div
+          className="absolute inset-0 opacity-[0.12] pointer-events-none"
+          style={{ backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "28px 28px", maskImage: "radial-gradient(ellipse at center, black 20%, transparent 75%)" }}
+        />
         <div className="relative mx-auto max-w-3xl">
-          <div className="inline-flex items-center gap-2 bg-white/10 text-white px-4 py-1.5 rounded-full text-sm font-medium mb-6">
+          <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 text-white px-4 py-1.5 rounded-full text-sm font-medium mb-6">
             🇮🇳 We&apos;re hiring across India
           </div>
-          <h1 className="text-4xl sm:text-5xl font-bold text-white leading-tight mb-4">
-            Build the future of AI education in India
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-[1.05] mb-4">
+            Build the future of<br />AI education in India
           </h1>
           <p className="text-lg text-violet-200 max-w-xl mx-auto mb-8">
             Join a small, ambitious team on a mission to make world-class AI education accessible to every Indian learner.
           </p>
-          <a href="#roles" className="px-8 py-4 bg-white text-violet-700 font-semibold rounded-xl hover:bg-violet-50 shadow-lg transition-all hover:scale-105 inline-block">
+          <a href="#roles" className="px-8 py-4 bg-white text-violet-700 font-bold rounded-xl hover:bg-violet-50 shadow-lg transition-all hover:scale-105 inline-block">
             See Open Roles ↓
           </a>
         </div>

@@ -1,4 +1,7 @@
-import Link from "next/link";
+import { RevealOnScroll } from "@/components/home/RevealOnScroll";
+import { AnimatedCounter } from "@/components/home/AnimatedCounter";
+import { MagneticButton } from "@/components/home/MagneticButton";
+import { SectionHeading } from "@/components/shared/SectionHeading";
 
 const team = [
   { name: "Rahul Mehta", role: "Co-Founder & Head of AI Curriculum", bio: "Former AI Lead at Infosys. 8+ years in ML engineering. IIT Delhi alumni.", initial: "R", color: "from-orange-400 to-amber-500" },
@@ -28,33 +31,36 @@ export default function AboutPage() {
     <div className="min-h-screen bg-white">
 
       {/* ── Hero ── */}
-      <section className="relative py-24 bg-gradient-to-br from-violet-900 via-purple-900 to-indigo-900 overflow-hidden">
-        <div className="absolute inset-0 opacity-10 pointer-events-none">
-          <div className="absolute top-10 left-1/4 w-80 h-80 bg-violet-400 rounded-full blur-3xl" />
-          <div className="absolute bottom-10 right-1/4 w-80 h-80 bg-indigo-400 rounded-full blur-3xl" />
+      <section className="relative py-24 lg:py-28 bg-gradient-to-br from-violet-900 via-purple-900 to-indigo-900 overflow-hidden">
+        <div className="absolute inset-0 opacity-20 pointer-events-none">
+          <div className="absolute top-10 left-1/4 w-80 h-80 bg-violet-400 rounded-full blur-3xl animate-blob-1" />
+          <div className="absolute bottom-10 right-1/4 w-80 h-80 bg-indigo-400 rounded-full blur-3xl animate-blob-2" />
         </div>
+        <div
+          className="absolute inset-0 opacity-[0.12] pointer-events-none"
+          style={{ backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "28px 28px", maskImage: "radial-gradient(ellipse at center, black 20%, transparent 75%)" }}
+        />
         <div className="relative mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 text-center">
-          <div className="inline-flex items-center gap-2 bg-white/10 text-white px-4 py-1.5 rounded-full text-sm font-medium mb-6">
-            🇮🇳 Made in India, for India
-          </div>
-          <h1 className="text-4xl sm:text-5xl font-bold text-white leading-tight">
-            We&apos;re on a mission to make<br />
-            <span className="bg-gradient-to-r from-violet-300 to-pink-300 bg-clip-text text-transparent">
-              AI education accessible
-            </span>
-            {" "}to every Indian
-          </h1>
-          <p className="mt-6 text-lg text-violet-200 max-w-2xl mx-auto leading-relaxed">
-            LearnAI was started in Bangalore by a group of AI engineers and educators who believed that world-class AI education shouldn&apos;t cost ₹50,000 or require a foreign degree.
-          </p>
-          <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/courses" className="px-8 py-3.5 bg-white text-violet-700 font-semibold rounded-xl hover:bg-violet-50 shadow-lg transition-all hover:scale-105">
-              Explore Courses
-            </Link>
-            <Link href="/contact" className="px-8 py-3.5 bg-white/10 text-white font-semibold rounded-xl border border-white/30 hover:bg-white/20 transition-all">
-              Get in Touch
-            </Link>
-          </div>
+          <RevealOnScroll>
+            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 text-white px-4 py-1.5 rounded-full text-sm font-medium mb-6">
+              🇮🇳 Made in India, for India
+            </div>
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-[1.05]">
+              We&apos;re on a mission to make<br />
+              <span className="bg-gradient-to-r from-violet-300 to-pink-300 bg-clip-text text-transparent">AI education accessible</span>{" "}to every Indian
+            </h1>
+            <p className="mt-6 text-lg text-violet-200 max-w-2xl mx-auto leading-relaxed">
+              LearnAI was started in Bangalore by a group of AI engineers and educators who believed that world-class AI education shouldn&apos;t cost ₹50,000 or require a foreign degree.
+            </p>
+            <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
+              <MagneticButton href="/courses" strength={10} className="px-8 py-3.5 bg-white text-violet-700 font-bold rounded-xl hover:bg-violet-50 shadow-lg transition-colors">
+                Explore Courses
+              </MagneticButton>
+              <MagneticButton href="/contact" strength={6} className="px-8 py-3.5 bg-white/10 backdrop-blur-sm text-white font-bold rounded-xl border border-white/30 hover:bg-white/20 transition-colors">
+                Get in Touch
+              </MagneticButton>
+            </div>
+          </RevealOnScroll>
         </div>
       </section>
 
@@ -63,15 +69,17 @@ export default function AboutPage() {
         <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             {[
-              { value: "50,000+", label: "Students" },
-              { value: "12+", label: "Courses" },
-              { value: "5,000+", label: "Certificates" },
-              { value: "94%", label: "Completion Rate" },
-            ].map((s) => (
-              <div key={s.label}>
-                <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">{s.value}</div>
+              { to: 50000, suffix: "+", label: "Students", indian: true },
+              { to: 12, suffix: "+", label: "Courses" },
+              { to: 5000, suffix: "+", label: "Certificates", indian: true },
+              { to: 94, suffix: "%", label: "Completion Rate" },
+            ].map((s, i) => (
+              <RevealOnScroll key={s.label} delay={i * 80}>
+                <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">
+                  <AnimatedCounter to={s.to} suffix={s.suffix} indian={s.indian} />
+                </div>
                 <div className="mt-1 text-sm text-gray-500">{s.label}</div>
-              </div>
+              </RevealOnScroll>
             ))}
           </div>
         </div>
@@ -80,23 +88,24 @@ export default function AboutPage() {
       {/* ── Our Story / Timeline ── */}
       <section className="py-20 px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-4xl">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900">Our Story</h2>
-            <p className="mt-3 text-lg text-gray-500">From a Bangalore apartment to India&apos;s leading AI learning platform</p>
-          </div>
+          <RevealOnScroll>
+            <SectionHeading eyebrow="Our story" title="From a Bangalore apartment to India's leading AI platform" className="mb-14" />
+          </RevealOnScroll>
           <div className="relative">
             <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gradient-to-b from-violet-200 via-indigo-200 to-transparent" />
             <div className="space-y-10">
               {milestones.map((m, i) => (
-                <div key={i} className="flex gap-6 items-start">
-                  <div className="relative flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg z-10">
-                    <div className="w-3 h-3 bg-white rounded-full" />
+                <RevealOnScroll key={i} delay={i * 60} from="left">
+                  <div className="flex gap-6 items-start">
+                    <div className="relative flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg z-10">
+                      <div className="w-3 h-3 bg-white rounded-full" />
+                    </div>
+                    <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex-1 hover:shadow-md transition-shadow">
+                      <div className="text-xs font-bold text-violet-600 mb-1">{m.year}</div>
+                      <p className="text-sm text-gray-700 leading-relaxed">{m.event}</p>
+                    </div>
                   </div>
-                  <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex-1 hover:shadow-md transition-shadow">
-                    <div className="text-xs font-bold text-violet-600 mb-1">{m.year}</div>
-                    <p className="text-sm text-gray-700 leading-relaxed">{m.event}</p>
-                  </div>
-                </div>
+                </RevealOnScroll>
               ))}
             </div>
           </div>
@@ -106,20 +115,22 @@ export default function AboutPage() {
       {/* ── Values ── */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50/50">
         <div className="mx-auto max-w-6xl">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900">What We Stand For</h2>
-          </div>
+          <RevealOnScroll>
+            <SectionHeading eyebrow="Our values" title="What we stand for" className="mb-14" />
+          </RevealOnScroll>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {values.map((v) => (
-              <div key={v.title} className="bg-white rounded-2xl p-7 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-100 to-indigo-100 flex items-center justify-center mb-4">
-                  <svg className="w-6 h-6 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={v.icon} />
-                  </svg>
+            {values.map((v, i) => (
+              <RevealOnScroll key={v.title} delay={i * 80}>
+                <div className="bg-white rounded-2xl p-7 border border-gray-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all h-full">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-100 to-indigo-100 flex items-center justify-center mb-4">
+                    <svg className="w-6 h-6 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={v.icon} />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">{v.title}</h3>
+                  <p className="text-sm text-gray-600 leading-relaxed">{v.desc}</p>
                 </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">{v.title}</h3>
-                <p className="text-sm text-gray-600 leading-relaxed">{v.desc}</p>
-              </div>
+              </RevealOnScroll>
             ))}
           </div>
         </div>
@@ -128,34 +139,39 @@ export default function AboutPage() {
       {/* ── Team ── */}
       <section className="py-20 px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-5xl">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900">Meet the Team</h2>
-            <p className="mt-3 text-gray-500 text-lg">AI practitioners turned educators</p>
-          </div>
+          <RevealOnScroll>
+            <SectionHeading eyebrow="The team" title="Meet the team" subtitle="AI practitioners turned educators" className="mb-14" />
+          </RevealOnScroll>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            {team.map((member) => (
-              <div key={member.name} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-lg transition-all flex items-start gap-5">
-                <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${member.color} flex items-center justify-center text-white text-2xl font-bold flex-shrink-0 shadow-md`}>
-                  {member.initial}
+            {team.map((member, i) => (
+              <RevealOnScroll key={member.name} delay={i * 80}>
+                <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all flex items-start gap-5 h-full">
+                  <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${member.color} flex items-center justify-center text-white text-2xl font-bold flex-shrink-0 shadow-md`}>
+                    {member.initial}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900">{member.name}</h3>
+                    <p className="text-sm text-violet-600 font-medium mb-2">{member.role}</p>
+                    <p className="text-xs text-gray-500 leading-relaxed">{member.bio}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-bold text-gray-900">{member.name}</h3>
-                  <p className="text-sm text-violet-600 font-medium mb-2">{member.role}</p>
-                  <p className="text-xs text-gray-500 leading-relaxed">{member.bio}</p>
-                </div>
-              </div>
+              </RevealOnScroll>
             ))}
           </div>
         </div>
       </section>
 
       {/* ── Enterprise / Colleges CTA ── */}
-      <section className="py-16 px-4 bg-gradient-to-r from-violet-600 to-indigo-600 text-center">
-        <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3">Bring AI Education to Your Institution</h2>
-        <p className="text-violet-200 mb-8 max-w-xl mx-auto">We partner with engineering colleges, companies, and bootcamps to deliver customised AI training. Get in touch for bulk pricing and custom curricula.</p>
-        <Link href="/contact?type=enterprise" className="inline-flex items-center gap-2 px-8 py-4 bg-white text-violet-700 font-semibold rounded-xl shadow-lg hover:bg-violet-50 transition-all hover:scale-105">
-          Contact Our Education Team →
-        </Link>
+      <section className="relative py-20 px-4 overflow-hidden bg-gradient-to-r from-violet-600 to-indigo-600 text-center">
+        <div className="absolute -top-20 -left-20 w-72 h-72 rounded-full bg-pink-400/20 blur-3xl animate-blob-1" />
+        <div className="absolute -bottom-20 -right-20 w-72 h-72 rounded-full bg-violet-300/20 blur-3xl animate-blob-2" />
+        <RevealOnScroll from="scale" className="relative">
+          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3">Bring AI education to your institution</h2>
+          <p className="text-violet-200 mb-8 max-w-xl mx-auto">We partner with engineering colleges, companies, and bootcamps to deliver customised AI training. Get in touch for bulk pricing and custom curricula.</p>
+          <MagneticButton href="/contact?type=enterprise" strength={12} className="inline-flex items-center gap-2 px-8 py-4 bg-white text-violet-700 font-bold rounded-xl shadow-lg hover:bg-violet-50 transition-colors">
+            Contact Our Education Team →
+          </MagneticButton>
+        </RevealOnScroll>
       </section>
     </div>
   );
