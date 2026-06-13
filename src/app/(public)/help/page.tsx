@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { MeshGradient } from "@/components/home/MeshGradient";
 
 const helpCategories = [
   {
@@ -77,13 +78,13 @@ export default function HelpPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Hero */}
-      <section className="pt-20 pb-14 bg-gradient-to-br from-violet-50 via-white to-indigo-50">
-        <div className="mx-auto max-w-3xl px-4 text-center">
-          <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">
+      <section className="relative overflow-hidden pt-24 pb-14">
+        <MeshGradient />
+        <div className="relative mx-auto max-w-3xl px-4 text-center">
+          <span className="text-xs font-bold tracking-widest uppercase text-violet-600">Help center</span>
+          <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-gray-900 mt-2 mb-5">
             How can we{" "}
-            <span className="bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">
-              help?
-            </span>
+            <span className="bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">help?</span>
           </h1>
           <div className="relative max-w-lg mx-auto">
             <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

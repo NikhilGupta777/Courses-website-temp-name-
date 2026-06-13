@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { Header } from "@/components/layout/header";
-import { Footer } from "@/components/layout/footer";
+import { SiteChrome } from "@/components/layout/SiteChrome";
 import { SessionProvider } from "next-auth/react";
 import { TRPCProvider } from "@/components/providers/trpc-provider";
 import { ToastProvider } from "@/components/ui/toast";
@@ -125,9 +124,7 @@ export default function RootLayout({
         <SessionProvider>
           <TRPCProvider>
             <ToastProvider>
-              <Header />
-              <main className="min-h-screen pt-16">{children}</main>
-              <Footer />
+              <SiteChrome>{children}</SiteChrome>
             </ToastProvider>
           </TRPCProvider>
         </SessionProvider>

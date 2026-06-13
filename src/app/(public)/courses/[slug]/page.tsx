@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { trpcClient } from "@/lib/trpc/client";
-import { CATEGORY_COLORS } from "@/lib/data/courses";
 import { CourseJsonLd, BreadcrumbJsonLd } from "@/components/seo/json-ld";
 import { ReviewForm } from "@/components/course/ReviewForm";
 import { EnrollButton } from "@/components/course/EnrollButton";
+import { illustrationFor } from "@/components/home/CourseIllustrations";
 
 function StarRating({ rating }: { rating: number }) {
   return (
@@ -51,7 +51,6 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ s
   } catch { /* use defaults */ }
 
   const catSlug = course.category?.slug ?? "prompting";
-  const colors = CATEGORY_COLORS[catSlug] ?? { from: "from-violet-100", to: "to-indigo-200", icon: "text-violet-600" };
   const discount = (course.originalPrice ?? 0) > (course.price ?? 0) && (course.originalPrice ?? 0) > 0
     ? Math.round((1 - (course.price ?? 0) / (course.originalPrice ?? 1)) * 100)
     : 0;
@@ -77,8 +76,15 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ s
       ]} />
 
       {/* Hero */}
-      <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
+      <div className="relative bg-gradient-to-br from-violet-950 via-gray-900 to-indigo-950 text-white overflow-hidden">
+        {/* Decorative glows + dotted grid */}
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-violet-500/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
+        <div
+          className="absolute inset-0 opacity-[0.15] pointer-events-none"
+          style={{ backgroundImage: "radial-gradient(circle, #a78bfa 1px, transparent 1px)", backgroundSize: "26px 26px" }}
+        />
+        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14">
           <nav className="flex items-center gap-2 text-sm text-gray-400 mb-6">
             <Link href="/" className="hover:text-white transition-colors">Home</Link>
             <span>/</span>
@@ -86,26 +92,33 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ s
             <span>/</span>
             <span className="text-gray-300 truncate max-w-xs">{course.title}</span>
           </nav>
-          <div className="lg:grid lg:grid-cols-3 lg:gap-12">
+          <div className="lg:grid lg:grid-cols-3 lg:gap-12 items-center">
             <div className="lg:col-span-2">
               <div className="flex flex-wrap items-center gap-2 mb-4">
-                <span className="text-xs font-medium bg-white/10 text-gray-300 px-3 py-1 rounded-full">{course.category?.name?.toUpperCase() ?? "AI"}</span>
-                <span className="text-xs font-medium bg-white/10 text-gray-300 px-3 py-1 rounded-full">{course.level}</span>
+                <span className="text-xs font-semibold bg-violet-500/20 text-violet-200 px-3 py-1 rounded-full border border-violet-400/20">{course.category?.name?.toUpperCase() ?? "AI"}</span>
+                <span className="text-xs font-semibold bg-white/10 text-gray-300 px-3 py-1 rounded-full">{course.level}</span>
+                {course.isFree && <span className="text-xs font-bold bg-green-500 text-white px-3 py-1 rounded-full">FREE</span>}
               </div>
-              <h1 className="text-3xl sm:text-4xl font-bold text-white leading-tight">{course.title}</h1>
-              {course.subtitle && <p className="mt-3 text-lg text-gray-300">{course.subtitle}</p>}
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-tight">{course.title}</h1>
+              {course.subtitle && <p className="mt-3 text-lg text-gray-300 max-w-2xl">{course.subtitle}</p>}
               <div className="mt-5 flex flex-wrap items-center gap-4 text-sm">
                 <div className="flex items-center gap-2">
                   <StarRating rating={course.averageRating} />
                   <span className="font-semibold text-yellow-400">{course.averageRating.toFixed(1)}</span>
-                  <span className="text-gray-400">({course.totalReviews.toLocaleString()} reviews)</span>
+                  <span className="text-gray-400">({course.totalReviews.toLocaleString("en-IN")} reviews)</span>
                 </div>
-                <span className="text-gray-400">{course.totalStudents.toLocaleString()} students</span>
+                <span className="text-gray-400">{course.totalStudents.toLocaleString("en-IN")} students</span>
               </div>
               <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-gray-400">
                 <span>By <span className="text-violet-300 font-medium">{instructorName}</span></span>
                 <span>·</span>
                 <span>{course.deliveryMode === "HYBRID" ? "🎥 Live + Pre-recorded" : "📹 Pre-recorded"}</span>
+              </div>
+            </div>
+            {/* Floating illustration */}
+            <div className="hidden lg:block lg:col-span-1">
+              <div className="rounded-2xl overflow-hidden border border-white/10 shadow-2xl aspect-[16/10] animate-float-sway">
+                {illustrationFor(catSlug)}
               </div>
             </div>
           </div>
@@ -251,11 +264,9 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ s
           {/* Sticky enrollment card */}
           <div className="mt-10 lg:mt-0">
             <div className="sticky top-20">
-              <div className="rounded-2xl border border-gray-200 shadow-xl overflow-hidden">
-                <div className={`h-48 bg-gradient-to-br ${colors.from} ${colors.to} flex items-center justify-center`}>
-                  <div className="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
-                    <svg className={`w-7 h-7 ${colors.icon} ml-1`} fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-                  </div>
+              <div className="rounded-2xl border border-gray-200 shadow-xl overflow-hidden bg-white">
+                <div className="relative aspect-[16/10] overflow-hidden">
+                  {illustrationFor(catSlug)}
                 </div>
                 <div className="p-6 space-y-4">
                   <div>
