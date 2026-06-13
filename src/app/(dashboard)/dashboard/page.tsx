@@ -114,15 +114,23 @@ export default function DashboardPage() {
       )}
 
       <main className="flex-1 min-w-0 pt-16">
-        <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between">
-          <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors">
-            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">Welcome back, {userName.split(" ")[0]}! 👋</h1>
-            <p className="text-sm text-gray-500">Here&apos;s your learning summary</p>
+        {/* Welcome banner */}
+        <div className="relative overflow-hidden bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 px-4 sm:px-6 py-7">
+          <div className="absolute -top-16 -right-10 w-64 h-64 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+          <div
+            className="absolute inset-0 opacity-[0.12] pointer-events-none"
+            style={{ backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "24px 24px" }}
+          />
+          <div className="relative flex items-center gap-3">
+            <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 rounded-lg hover:bg-white/10 transition-colors">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Welcome back, {userName.split(" ")[0]}! 👋</h1>
+              <p className="text-sm text-violet-100">Here&apos;s your learning summary for today.</p>
+            </div>
           </div>
         </div>
 
@@ -130,7 +138,7 @@ export default function DashboardPage() {
           {/* Stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {statCards.map((stat) => (
-              <div key={stat.label} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+              <div key={stat.label} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${stat.color}`}>
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={stat.icon} />
